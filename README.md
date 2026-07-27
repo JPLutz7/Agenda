@@ -87,6 +87,37 @@ docker run -p 3000:3000 -v agenda-data:/data \
 On iPhone, open it in Safari and *Add to Home Screen* — it runs full-screen
 like an app, with no App Store involved.
 
+## Staying up to date
+
+Once it's sitting on a home screen it needs to behave like an app that knows
+things have changed. Three separate mechanisms, because there are three
+separate ways a phone web app goes stale:
+
+- **Someone else made a change.** Every screen re-fetches from the server every
+  45 seconds while it's open, so a chore your roommate ticks off shows up on
+  your phone without you touching anything. Polling stops while the app is in
+  the background.
+- **You reopened the app.** iOS freezes a backgrounded home-screen app and
+  hands back the pixels you left behind, which is how these apps end up showing
+  yesterday's agenda with nothing on screen admitting it. The app refreshes on
+  foreground, on window focus, on coming back online, and on Safari's
+  back/forward cache restore.
+- **The code changed.** Pages are served `no-store` and there is **no service
+  worker anywhere in this project** — that's the deliberate part. A service
+  worker serves its own cache first and needs a correct update dance to ever
+  let go of it, which is the usual reason an installed web app gets stuck on a
+  version from three deploys ago. Without one, a deploy reaches both phones the
+  next time either of you opens the app, with nothing to invalidate and no
+  "clear your cache" conversation.
+
+A refresh will not fire while you're typing in a field — otherwise the form
+would re-render out from under the keyboard mid-word. It catches up as soon as
+the field loses focus.
+
+The cost of skipping the service worker is that the app needs a connection; it
+won't open on the subway. That's the right trade for something whose entire job
+is telling you what's true right now.
+
 ## How it's put together
 
 - **Next.js App Router**, server components, server actions for every mutation.
