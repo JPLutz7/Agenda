@@ -1,6 +1,6 @@
 # Fly.io deployment.
 #
-# Change `app` to whatever name you claim, then see DEPLOY.md.
+# Change `app` below to the name you claim, then follow DEPLOY.md.
 #
 # THE ONE RULE: run exactly one machine. The database is a SQLite file on the
 # volume below, and a Fly volume attaches to a single machine. A second machine
@@ -10,7 +10,10 @@
 # Say no. See `fly scale count 1` in DEPLOY.md.
 
 app = "agenda"
-primary_region = "iad"
+
+# Chicago — the closest Fly region to South Bend, about 90 miles away.
+# The volume must be created in this same region.
+primary_region = "ord"
 
 [build]
 
@@ -27,12 +30,13 @@ primary_region = "iad"
 [http_service]
   internal_port = 3000
   force_https = true
-  # Sleeps when nobody's looking and wakes on the next request, which keeps
-  # this close to free. Suspend rather than stop, so waking is quick and
-  # SQLite is never killed mid-write.
-  auto_stop_machines = "suspend"
+  # Always on, deliberately. Sleeping would be cheaper, but it also means no
+  # cold-start delay when you open the app and — more importantly — the
+  # background calendar sync in src/instrumentation.ts actually runs, so
+  # iCloud data is already current before either of you looks at it.
+  auto_stop_machines = "off"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
 [[vm]]
   size = "shared-cpu-1x"

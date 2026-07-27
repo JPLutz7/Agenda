@@ -11,8 +11,15 @@
 
 export type DayKey = string; // 'YYYY-MM-DD'
 
-/** The timezone the apartment lives in. One place, one answer. */
-export const DEFAULT_TIMEZONE = "America/New_York";
+/**
+ * The timezone the apartment lives in. One place, one answer.
+ *
+ * Notre Dame is in St. Joseph County, which is Eastern and observes DST.
+ * Indiana is not uniform about this — the northwest corner of the state runs
+ * on Central — so this is the county's zone rather than a state-wide guess.
+ * Changeable in Setup.
+ */
+export const DEFAULT_TIMEZONE = "America/Indiana/Indianapolis";
 
 const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>();
 

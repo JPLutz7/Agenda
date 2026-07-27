@@ -16,10 +16,18 @@ survives the container being destroyed and replaced — that's been tested.
 
 ---
 
-## Fly.io (recommended)
+## Fly.io
 
-Free HTTPS, a real volume, no monthly minimum, and it sleeps when nobody's
-using it.
+Configured for **one always-on machine in `ord` (Chicago)** — the closest Fly
+region to South Bend, about 90 miles out.
+
+Always-on rather than sleeping is a deliberate choice, and it's what
+`min_machines_running = 1` in `fly.toml` does. It costs roughly $3.50/month
+instead of about $0.50, and buys two things: no cold-start pause when you open
+the app, and a background calendar sync that actually runs. That sync
+(`src/instrumentation.ts`) pulls iCloud every 10 minutes whether or not anyone
+is looking, so the data is already current when you open the app rather than
+being fetched while you wait.
 
 ### 1. Install and sign in
 
@@ -34,16 +42,18 @@ App names are global, so `agenda` is long gone. Edit `app` in `fly.toml` to
 something like `agenda-<yourlastname>`. Your URL becomes
 `https://<that-name>.fly.dev`.
 
-Set `primary_region` to somewhere near you — `fly platform regions` lists them.
+Leave `primary_region = "ord"` alone unless you move — that's Chicago, the
+closest region to Notre Dame.
 
 ### 3. Create the app and its volume
 
 ```bash
 fly apps create <your-app-name>
-fly volumes create agenda_data --size 1 --region <your-region> --yes
+fly volumes create agenda_data --size 1 --region ord --yes
 ```
 
-One gigabyte is far more than this will ever need.
+One gigabyte is far more than this will ever need. **The volume region must
+match `primary_region`** — a volume in the wrong region simply won't attach.
 
 ### 4. Set the session secret
 
@@ -68,6 +78,11 @@ fly open
 
 The first screen asks for both your names and a household passcode. Give the
 passcode to your roommate — that's the whole account system.
+
+The app's timezone already defaults to `America/Indiana/Indianapolis`, which is
+St. Joseph County's zone — Eastern, with daylight saving. (Indiana isn't
+uniform: the northwest corner of the state runs on Central. South Bend does
+not.) You can change it in Setup if you ever move.
 
 ### 6. Put it on your phones
 
