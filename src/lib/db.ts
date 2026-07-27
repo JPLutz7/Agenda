@@ -25,7 +25,33 @@ function open(): Database.Database {
   return db;
 }
 
+function columnsOf(db: Database.Database, table: string): string[] {
+  return db
+    .prepare<[], { name: string }>(`PRAGMA table_info(${table})`)
+    .all()
+    .map((c) => c.name);
+}
+
 function migrate(db: Database.Database) {
+  // Must run before the schema below. `events` gained a calendar_id column,
+  // and the schema creates an index on it — against a database created by an
+  // earlier version that statement throws "no such column" and takes the whole
+  // migration down with it, before any of the fix-ups further down can run.
+  //
+  // Dropping is safe and cheap because this table is only ever a cache of what
+  // the calendar sources returned; the next sync rebuilds it. CREATE TABLE
+  // IF NOT EXISTS below then makes it in the current shape.
+  const existingEventColumns = columnsOf(db, "events");
+  if (
+    existingEventColumns.length > 0 &&
+    !existingEventColumns.includes("calendar_id")
+  ) {
+    db.exec("DROP TABLE events");
+    if (columnsOf(db, "feeds").length > 0) {
+      db.exec("UPDATE feeds SET last_synced_at = NULL");
+    }
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS people (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,21 +73,48 @@ function migrate(db: Database.Database) {
       created_at     TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- Occurrences expanded from the feeds. This whole table is a cache:
-    -- sync deletes and rebuilds a feed's rows, so nothing the user typed
-    -- ever lives here.
-    CREATE TABLE IF NOT EXISTS events (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      feed_id   INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
-      uid       TEXT NOT NULL,
-      summary   TEXT NOT NULL,
-      location  TEXT,
-      starts_at TEXT NOT NULL,  -- all-day: 'YYYY-MM-DD', timed: ISO UTC
-      ends_at   TEXT NOT NULL,
-      all_day   INTEGER NOT NULL DEFAULT 0
+    -- An iCloud account reached over CalDAV. Unlike a published feed this is
+    -- read *and* write, which is why it needs credentials.
+    CREATE TABLE IF NOT EXISTS caldav_accounts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      person_id   INTEGER REFERENCES people(id) ON DELETE CASCADE,
+      label       TEXT NOT NULL,
+      server_url  TEXT NOT NULL,
+      username    TEXT NOT NULL,
+      password_enc TEXT NOT NULL,   -- AES-256-GCM, see lib/secrets.ts
+      last_error  TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    CREATE INDEX IF NOT EXISTS events_starts_idx ON events(starts_at);
-    CREATE INDEX IF NOT EXISTS events_feed_idx   ON events(feed_id);
+
+    CREATE TABLE IF NOT EXISTS caldav_calendars (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id     INTEGER NOT NULL REFERENCES caldav_accounts(id) ON DELETE CASCADE,
+      url            TEXT NOT NULL,
+      display_name   TEXT NOT NULL,
+      read_only      INTEGER NOT NULL DEFAULT 0,
+      enabled        INTEGER NOT NULL DEFAULT 1,
+      last_synced_at TEXT,
+      last_error     TEXT,
+      UNIQUE(account_id, url)
+    );
+
+    -- Occurrences expanded from every source. This whole table is a cache:
+    -- a sync deletes and rebuilds one source's rows, so nothing the user
+    -- typed ever lives here. Exactly one of feed_id / calendar_id is set.
+    CREATE TABLE IF NOT EXISTS events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      feed_id     INTEGER REFERENCES feeds(id) ON DELETE CASCADE,
+      calendar_id INTEGER REFERENCES caldav_calendars(id) ON DELETE CASCADE,
+      uid         TEXT NOT NULL,
+      summary     TEXT NOT NULL,
+      location    TEXT,
+      starts_at   TEXT NOT NULL,  -- all-day: 'YYYY-MM-DD', timed: ISO UTC
+      ends_at     TEXT NOT NULL,
+      all_day     INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS events_starts_idx   ON events(starts_at);
+    CREATE INDEX IF NOT EXISTS events_feed_idx     ON events(feed_id);
+    CREATE INDEX IF NOT EXISTS events_calendar_idx ON events(calendar_id);
 
     -- Events created in the app. The iCloud feeds are read-only, so this is
     -- how household stuff gets onto the calendar.
@@ -73,7 +126,13 @@ function migrate(db: Database.Database) {
       ends_at    TEXT NOT NULL,
       all_day    INTEGER NOT NULL DEFAULT 0,
       created_by INTEGER REFERENCES people(id) ON DELETE SET NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      -- The counterpart in iCloud, when one was written. Null means this
+      -- event lives only in this app.
+      caldav_calendar_id INTEGER,
+      caldav_url         TEXT,
+      caldav_uid         TEXT,
+      caldav_etag        TEXT
     );
     CREATE INDEX IF NOT EXISTS household_events_starts_idx
       ON household_events(starts_at);
@@ -115,6 +174,33 @@ function migrate(db: Database.Database) {
       value TEXT NOT NULL
     );
   `);
+
+  // --- changes to tables that already exist in someone's database ---
+
+  // Bring a database made by an earlier version up to the shape above. The
+  // create statement already includes these, so this only fires on an
+  // existing database.
+  //
+  // Checking first and adding second is a race when two processes start
+  // together — Next.js does exactly that during a build — and the loser's
+  // ALTER fails on a column the winner just added. Both halves of the check
+  // are therefore belt and braces: skip what's there, and treat "already
+  // exists" as success rather than an error.
+  const householdColumns = columnsOf(db, "household_events");
+  for (const [name, type] of [
+    ["caldav_calendar_id", "INTEGER"],
+    ["caldav_url", "TEXT"],
+    ["caldav_uid", "TEXT"],
+    ["caldav_etag", "TEXT"],
+  ] as const) {
+    if (householdColumns.includes(name)) continue;
+    try {
+      db.exec(`ALTER TABLE household_events ADD COLUMN ${name} ${type}`);
+    } catch (err) {
+      if (!/duplicate column name/i.test(String(err))) throw err;
+    }
+  }
+
 }
 
 export const db: Database.Database =

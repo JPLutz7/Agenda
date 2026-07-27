@@ -32,8 +32,36 @@ Data goes in `./data/agenda.db` (SQLite). Set `AGENDA_DB_PATH` to move it.
 
 ## Connecting a calendar
 
-iCloud has no API, but it will publish a calendar as a read-only `.ics` feed,
-which is what this reads.
+Two ways, and they are not equivalent.
+
+### Connecting the account (two-way, recommended)
+
+iCloud speaks **CalDAV** — the protocol the Calendar app itself uses. Connect
+the account and events created in Agenda are written into your real iCloud
+calendar, so they appear on both phones in the normal Calendar app. Deleting
+one here deletes it there.
+
+1. Go to **appleid.apple.com** → Sign-In and Security → *App-Specific
+   Passwords*, and generate one.
+2. In **Setup → Connect an iCloud account**, enter your Apple ID and that
+   password.
+3. Pick which calendars to show, and which one new events should be written to.
+
+Your normal Apple ID password will not work while two-factor authentication is
+on — it has to be an app-specific one.
+
+**About the credentials.** An app-specific password is not a scoped token; it
+grants access to that Apple ID's calendar data. It's encrypted at rest with
+AES-256-GCM using a key derived from `AGENDA_SECRET`, which lives in the
+environment and never in the database — so a copy of the database file alone is
+not enough to read it. `AGENDA_SECRET` must be set before an account can be
+connected. You can revoke the password from that same Apple page at any time,
+which disconnects Agenda without affecting your account.
+
+### Publishing a link (read-only, simpler)
+
+iCloud will also publish a calendar as a read-only `.ics` feed, which needs no
+credentials. Nothing you add in Agenda can reach your real calendar this way.
 
 1. **On a Mac:** Calendar → right-click the calendar → *Share Calendar*.
    **On iPhone:** Calendars → the ⓘ next to the calendar.
@@ -43,22 +71,23 @@ which is what this reads.
 Repeat for each calendar. Feeds refresh when someone opens the app and the data
 is more than ten minutes old.
 
-### Two things to know before you publish
+Two things to know before you publish one:
 
 - **A published iCloud calendar is readable by anyone with the link.** It's a
   long random URL, not a password. That's fine for an apartment calendar; think
   about it before publishing a personal one. To share only some events, make a
   second calendar in iCloud and publish that instead.
-- **It's read-only, in both directions.** This app can't change anything in
-  iCloud, and events added here don't appear in your phone's Calendar app. That
-  isn't a bug — it's the limit of what a published feed allows.
+- **It's read-only, in both directions.** Events added in Agenda don't appear
+  in your phone's Calendar app. That isn't a bug — it's the limit of what a
+  published feed allows. Connect the account instead if you want write-back.
 
 ## Configuration
 
 | Variable | Default | What it's for |
 | --- | --- | --- |
 | `AGENDA_DB_PATH` | `./data/agenda.db` | Where the SQLite file lives. |
-| `AGENDA_SECRET` | generated, stored in the DB | Signs session cookies. Set it in production so sessions survive a database reset. |
+| `AGENDA_SECRET` | generated, stored in the DB | Signs session cookies, and derives the key that encrypts iCloud passwords. **Required** before an iCloud account can be connected. |
+| `AGENDA_CALDAV_URL` | `https://caldav.icloud.com` | The CalDAV server to connect to. Change it for Fastmail or a self-hosted server. |
 | `AGENDA_CRON_SECRET` | unset | Enables `GET /api/refresh` for an external scheduler. |
 
 Set the household timezone in **Setup**. Every day boundary and chore due date

@@ -1,5 +1,13 @@
 import { requireSignedIn } from "@/lib/guard";
-import { getFeeds, getPeople, timezone } from "@/lib/data";
+import {
+  getCalDavAccounts,
+  getFeeds,
+  getPeople,
+  getWriteCalendar,
+  timezone,
+} from "@/lib/data";
+import { canStoreSecrets } from "@/lib/secrets";
+import { ICloudSetup } from "@/components/icloud-setup";
 import {
   addFeed,
   addPerson,
@@ -32,6 +40,9 @@ export default async function SettingsPage({
   const people = getPeople();
   const feeds = getFeeds();
   const tz = timezone();
+  const accounts = getCalDavAccounts();
+  const writeCalendar = getWriteCalendar();
+  const secretsAvailable = canStoreSecrets();
 
   return (
     <>
@@ -49,10 +60,23 @@ export default async function SettingsPage({
         </div>
       )}
 
-      <SectionTitle>Calendars</SectionTitle>
+      <SectionTitle>iCloud (two-way)</SectionTitle>
+      <ICloudSetup
+        accounts={accounts}
+        people={people}
+        writeCalendarId={writeCalendar?.id ?? null}
+        secretsAvailable={secretsAvailable}
+      />
+
+      <SectionTitle>Published links (read-only)</SectionTitle>
 
       <Card className="mb-3 p-4 text-sm">
         <p className="font-medium">Getting the link out of iCloud</p>
+        <p className="mt-2 text-muted">
+          An alternative to connecting the account above. Simpler, but it can
+          only be read &mdash; nothing you add in this app will reach your real
+          calendar this way.
+        </p>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted">
           <li>
             On a Mac: open Calendar, right-click the calendar, choose{" "}

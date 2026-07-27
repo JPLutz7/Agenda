@@ -1,5 +1,6 @@
 "use server";
 
+import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db, setSetting } from "./db";
@@ -11,10 +12,24 @@ import {
   startSession,
   verifyPasscode,
 } from "./auth";
-import { assigneeFor, getPeople, timezone } from "./data";
+import { assigneeFor, getPeople, getWriteCalendar, timezone } from "./data";
 import { addDays, today } from "./dates";
 import { normalizeFeedUrl } from "./ics";
-import { syncAllFeeds, type FeedRow, syncFeed } from "./sync";
+import {
+  syncAllFeeds,
+  syncCalendar,
+  type CalendarRow,
+  type FeedRow,
+  syncFeed,
+} from "./sync";
+import {
+  ICLOUD_CALDAV_URL,
+  createRemoteEvent,
+  deleteRemoteEvent,
+  discoverCalendars,
+  type StoredAccount,
+} from "./caldav";
+import { canStoreSecrets, encryptSecret } from "./secrets";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -195,6 +210,161 @@ export async function setTimezone(
   return { ok: `Timezone set to ${tz}.` };
 }
 
+/* ------------------------------------------------------------ icloud (dav) */
+
+export async function connectICloudAccount(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+
+  if (!canStoreSecrets()) {
+    return {
+      error:
+        "AGENDA_SECRET isn't set on the server, so an Apple password can't " +
+        "be encrypted. Set it first — the deploy guide has the command.",
+    };
+  }
+
+  const username = text(form, "username", 200);
+  // Apple prints app-specific passwords with spaces; they aren't part of it.
+  const password = text(form, "password", 200).replace(/\s+/g, "");
+  const personRaw = text(form, "person_id", 20);
+  const personId = personRaw === "" || personRaw === "household"
+    ? null
+    : Number(personRaw);
+  const label = text(form, "label", 80) || username;
+
+  if (!username || !password) {
+    return { error: "Both the Apple ID and an app-specific password." };
+  }
+
+  // Verify before storing — no point keeping credentials that don't work.
+  let discovered;
+  try {
+    discovered = await discoverCalendars(
+      ICLOUD_CALDAV_URL,
+      username,
+      password,
+    );
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  if (discovered.length === 0) {
+    return { error: "That account has no calendars that can hold events." };
+  }
+
+  const accountId = db.transaction(() => {
+    const info = db
+      .prepare(
+        `INSERT INTO caldav_accounts (person_id, label, server_url, username, password_enc)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        personId,
+        label,
+        ICLOUD_CALDAV_URL,
+        username,
+        encryptSecret(password),
+      );
+    const id = Number(info.lastInsertRowid);
+    const insert = db.prepare(
+      `INSERT INTO caldav_calendars (account_id, url, display_name, read_only, enabled)
+       VALUES (?, ?, ?, ?, 1)`,
+    );
+    for (const c of discovered) {
+      insert.run(id, c.url, c.displayName, c.readOnly ? 1 : 0);
+    }
+    return id;
+  })();
+
+  // Pull them straight away so the calendar isn't empty on the way back.
+  const calendars = db
+    .prepare<[number], CalendarRow>(
+      `SELECT id, account_id, url, display_name FROM caldav_calendars
+       WHERE account_id = ? AND enabled = 1`,
+    )
+    .all(accountId);
+  const results = await Promise.all(calendars.map(syncCalendar));
+  const imported = results.reduce((sum, r) => sum + r.imported, 0);
+
+  refreshViews();
+  return {
+    ok: `Connected ${label}: ${discovered.length} calendars, ${imported} events.`,
+  };
+}
+
+export async function setCalendarEnabled(
+  calendarId: number,
+  form: FormData,
+): Promise<void> {
+  await requireSession();
+  const enabled = text(form, "enabled", 5) === "1" ? 1 : 0;
+  db.prepare("UPDATE caldav_calendars SET enabled = ? WHERE id = ?").run(
+    enabled,
+    calendarId,
+  );
+  if (enabled) {
+    const calendar = db
+      .prepare<[number], CalendarRow>(
+        "SELECT id, account_id, url, display_name FROM caldav_calendars WHERE id = ?",
+      )
+      .get(calendarId);
+    if (calendar) await syncCalendar(calendar);
+  } else {
+    db.prepare("DELETE FROM events WHERE calendar_id = ?").run(calendarId);
+  }
+  refreshViews();
+}
+
+/** Choose where events created in this app get written in iCloud. */
+export async function setWriteCalendar(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+  const raw = text(form, "calendar_id", 20);
+
+  if (raw === "" || raw === "none") {
+    setSetting("write_calendar_id", "");
+    refreshViews();
+    return { ok: "App events will stay in this app only." };
+  }
+
+  const calendar = db
+    .prepare<[number], { display_name: string; read_only: number }>(
+      "SELECT display_name, read_only FROM caldav_calendars WHERE id = ?",
+    )
+    .get(Number(raw));
+  if (!calendar) return { error: "That calendar no longer exists." };
+  if (calendar.read_only) {
+    return { error: `"${calendar.display_name}" is read-only in iCloud.` };
+  }
+
+  setSetting("write_calendar_id", raw);
+  refreshViews();
+  return { ok: `New events will be added to "${calendar.display_name}".` };
+}
+
+export async function disconnectICloudAccount(
+  accountId: number,
+): Promise<void> {
+  await requireSession();
+  // Anything already written to iCloud stays there; this only forgets the
+  // credentials and the local mirror.
+  db.prepare("DELETE FROM caldav_accounts WHERE id = ?").run(accountId);
+  refreshViews();
+}
+
+function writeAccountFor(calendarAccountId: number): StoredAccount | undefined {
+  return db
+    .prepare<[number], StoredAccount>(
+      "SELECT id, server_url, username, password_enc FROM caldav_accounts WHERE id = ?",
+    )
+    .get(calendarAccountId);
+}
+
 /* -------------------------------------------------------- household events */
 
 export async function addHouseholdEvent(
@@ -213,29 +383,79 @@ export async function addHouseholdEvent(
   if (!title) return { error: "The event needs a title." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick a date." };
 
+  let startsAt: string;
+  let endsAt: string;
+
   if (allDay) {
-    db.prepare(
-      `INSERT INTO household_events (title, notes, starts_at, ends_at, all_day)
-       VALUES (?, ?, ?, ?, 1)`,
-    ).run(title, notes, date, addDays(date, 1));
+    startsAt = date;
+    endsAt = addDays(date, 1); // all-day DTEND is exclusive
   } else {
     // The form collects wall-clock time in the household timezone; convert to
     // the UTC instant the rest of the app stores.
-    const startsAt = wallClockToUtc(date, startTime, timezone());
-    const endsAt = endTime
+    startsAt = wallClockToUtc(date, startTime, timezone());
+    endsAt = endTime
       ? wallClockToUtc(date, endTime, timezone())
       : new Date(Date.parse(startsAt) + 3_600_000).toISOString();
     if (Date.parse(endsAt) < Date.parse(startsAt)) {
       return { error: "The end time is before the start time." };
     }
-    db.prepare(
-      `INSERT INTO household_events (title, notes, starts_at, ends_at, all_day)
-       VALUES (?, ?, ?, ?, 0)`,
-    ).run(title, notes, startsAt, endsAt);
   }
 
+  // If an iCloud calendar is set as the write target, this event belongs in
+  // iCloud first — that's what makes it show up in the Calendar app on both
+  // phones rather than only here.
+  const writeCalendar = getWriteCalendar();
+  let remote: { url: string; etag: string | null } | null = null;
+  let uid: string | null = null;
+
+  if (writeCalendar) {
+    const account = writeAccountFor(writeCalendar.account_id);
+    if (!account) return { error: "That iCloud account is no longer connected." };
+
+    uid = `agenda-${crypto.randomUUID()}`;
+    try {
+      remote = await createRemoteEvent(account, writeCalendar.url, {
+        uid,
+        summary: title,
+        notes,
+        startsAt,
+        endsAt,
+        allDay,
+      });
+    } catch (err) {
+      // Deliberately not saving locally on failure. A local-only copy that the
+      // user believes is in their calendar is worse than a clear error.
+      return {
+        error: `Couldn't add it to iCloud: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
+  }
+
+  db.prepare(
+    `INSERT INTO household_events
+       (title, notes, starts_at, ends_at, all_day,
+        caldav_calendar_id, caldav_url, caldav_uid, caldav_etag)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    title,
+    notes,
+    startsAt,
+    endsAt,
+    allDay ? 1 : 0,
+    writeCalendar?.id ?? null,
+    remote?.url ?? null,
+    uid,
+    remote?.etag ?? null,
+  );
+
   refreshViews();
-  return { ok: `Added "${title}".` };
+  return {
+    ok: writeCalendar
+      ? `Added "${title}" to ${writeCalendar.display_name} in iCloud.`
+      : `Added "${title}".`,
+  };
 }
 
 /**
@@ -282,6 +502,41 @@ function wallClockToUtc(date: string, time: string, timeZone: string): string {
 
 export async function removeHouseholdEvent(eventId: number): Promise<void> {
   await requireSession();
+
+  const event = db
+    .prepare<
+      [number],
+      {
+        caldav_calendar_id: number | null;
+        caldav_url: string | null;
+        caldav_etag: string | null;
+      }
+    >(
+      `SELECT caldav_calendar_id, caldav_url, caldav_etag
+       FROM household_events WHERE id = ?`,
+    )
+    .get(eventId);
+  if (!event) return;
+
+  if (event.caldav_url && event.caldav_calendar_id) {
+    const calendar = db
+      .prepare<[number], { account_id: number }>(
+        "SELECT account_id FROM caldav_calendars WHERE id = ?",
+      )
+      .get(event.caldav_calendar_id);
+    const account = calendar ? writeAccountFor(calendar.account_id) : undefined;
+    if (account) {
+      try {
+        await deleteRemoteEvent(account, event.caldav_url, event.caldav_etag);
+      } catch {
+        // If iCloud can't be reached, keep the local row. Removing it here
+        // would strand the event in their real calendar with nothing left in
+        // the app pointing at it, and no way to try again.
+        return;
+      }
+    }
+  }
+
   db.prepare("DELETE FROM household_events WHERE id = ?").run(eventId);
   refreshViews();
 }

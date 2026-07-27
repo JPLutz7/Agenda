@@ -102,6 +102,12 @@ export function getEvents(from: DayKey, to: DayKey): AgendaEvent[] {
   const lowerBound = `${addDays(from, -2)}T00:00:00.000Z`;
   const upperBound = `${addDays(to, 2)}T23:59:59.999Z`;
 
+  // Events arrive from published feeds and from CalDAV calendars. Both carry
+  // a person via their source, so one query covers them with a coalesce.
+  //
+  // The NOT EXISTS clause is the important part: an event this app created and
+  // pushed to iCloud comes back down on the next sync, and without this it
+  // would appear twice — once as the local copy, once as the remote echo.
   const feedRows = db
     .prepare<
       [string, string],
@@ -117,11 +123,19 @@ export function getEvents(from: DayKey, to: DayKey): AgendaEvent[] {
       }
     >(
       `SELECT e.id, e.summary, e.location, e.starts_at, e.ends_at, e.all_day,
-              p.name AS person_name, p.color AS person_color
+              COALESCE(pf.name, pa.name)   AS person_name,
+              COALESCE(pf.color, pa.color) AS person_color
        FROM events e
-       JOIN feeds f  ON f.id = e.feed_id
-       LEFT JOIN people p ON p.id = f.person_id
-       WHERE e.ends_at >= ? AND e.starts_at <= ?`,
+       LEFT JOIN feeds f            ON f.id  = e.feed_id
+       LEFT JOIN people pf          ON pf.id = f.person_id
+       LEFT JOIN caldav_calendars c ON c.id  = e.calendar_id
+       LEFT JOIN caldav_accounts a  ON a.id  = c.account_id
+       LEFT JOIN people pa          ON pa.id = a.person_id
+       WHERE e.ends_at >= ? AND e.starts_at <= ?
+         AND NOT EXISTS (
+           SELECT 1 FROM household_events h
+           WHERE h.caldav_uid IS NOT NULL AND h.caldav_uid = e.uid
+         )`,
     )
     .all(lowerBound, upperBound);
 
@@ -272,6 +286,82 @@ export function assigneeFor(
   return people[((chore.rotation_index % people.length) + people.length) % people.length];
 }
 
+export type CalDavCalendarView = {
+  id: number;
+  url: string;
+  display_name: string;
+  read_only: number;
+  enabled: number;
+  last_synced_at: string | null;
+  last_error: string | null;
+  event_count: number;
+};
+
+export type CalDavAccountView = {
+  id: number;
+  label: string;
+  username: string;
+  person_name: string | null;
+  person_color: string | null;
+  last_error: string | null;
+  calendars: CalDavCalendarView[];
+};
+
+export function getCalDavAccounts(): CalDavAccountView[] {
+  const accounts = db
+    .prepare<
+      [],
+      {
+        id: number;
+        label: string;
+        username: string;
+        person_name: string | null;
+        person_color: string | null;
+        last_error: string | null;
+      }
+    >(
+      `SELECT a.id, a.label, a.username, a.last_error,
+              p.name AS person_name, p.color AS person_color
+       FROM caldav_accounts a
+       LEFT JOIN people p ON p.id = a.person_id
+       ORDER BY a.id`,
+    )
+    .all();
+
+  const calendarsFor = db.prepare<[number], CalDavCalendarView>(
+    `SELECT c.id, c.url, c.display_name, c.read_only, c.enabled,
+            c.last_synced_at, c.last_error,
+            (SELECT COUNT(*) FROM events e WHERE e.calendar_id = c.id) AS event_count
+     FROM caldav_calendars c
+     WHERE c.account_id = ?
+     ORDER BY c.display_name`,
+  );
+
+  return accounts.map((a) => ({ ...a, calendars: calendarsFor.all(a.id) }));
+}
+
+/** The calendar that app-created events get written to, if one is chosen. */
+export function getWriteCalendar(): {
+  id: number;
+  account_id: number;
+  url: string;
+  display_name: string;
+} | null {
+  const id = getSetting("write_calendar_id");
+  if (!id) return null;
+  return (
+    db
+      .prepare<
+        [number],
+        { id: number; account_id: number; url: string; display_name: string }
+      >(
+        `SELECT id, account_id, url, display_name FROM caldav_calendars
+         WHERE id = ? AND read_only = 0`,
+      )
+      .get(Number(id)) ?? null
+  );
+}
+
 export function getListItems(): { open: ListItem[]; done: ListItem[] } {
   const rows = db
     .prepare<[], ListItem>(
@@ -302,5 +392,7 @@ export function getDashboard() {
     list: getListItems(),
     people: getPeople(),
     feeds: getFeeds(),
+    accounts: getCalDavAccounts(),
+    writeCalendar: getWriteCalendar(),
   };
 }
