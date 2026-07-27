@@ -74,9 +74,11 @@ curl -H "Authorization: Bearer $AGENDA_CRON_SECRET" https://your-host/api/refres
 
 ## Deploying
 
-Any host that runs a Node process and gives you a persistent disk. The one hard
-requirement: **the SQLite file must survive redeploys.** On a platform with an
-ephemeral filesystem, the household's data resets every time you push.
+**See [DEPLOY.md](DEPLOY.md)** for step-by-step instructions. The short version:
+any host that runs a Node process and gives you a persistent disk, running
+**exactly one instance**. Two instances means two SQLite files and two versions
+of the truth. Serverless hosts like Vercel won't work — the filesystem resets
+and the data goes with it.
 
 ```bash
 docker build -t agenda .

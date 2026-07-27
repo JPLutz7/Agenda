@@ -1,0 +1,19 @@
+# Without this, `COPY . .` drops the host's node_modules over the ones just
+# installed in the image — including better-sqlite3's compiled binary, which is
+# built for the host and will not load in the container.
+node_modules
+.next
+
+# The household's database is never part of an image.
+data
+*.db
+*.db-shm
+*.db-wal
+
+.git
+.gitignore
+.claude
+README.md
+Dockerfile
+.dockerignore
+npm-debug.log*

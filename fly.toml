@@ -1,0 +1,39 @@
+# Fly.io deployment.
+#
+# Change `app` to whatever name you claim, then see DEPLOY.md.
+#
+# THE ONE RULE: run exactly one machine. The database is a SQLite file on the
+# volume below, and a Fly volume attaches to a single machine. A second machine
+# gets its own empty volume, so you and your roommate would land on different
+# databases depending on which one served the request — and neither would look
+# broken. `fly launch` offers to create two machines for high availability.
+# Say no. See `fly scale count 1` in DEPLOY.md.
+
+app = "agenda"
+primary_region = "iad"
+
+[build]
+
+[env]
+  AGENDA_DB_PATH = "/data/agenda.db"
+  PORT = "3000"
+
+# The household's data. Without this the SQLite file lives in the container's
+# temporary filesystem and every deploy wipes it.
+[[mounts]]
+  source = "agenda_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Sleeps when nobody's looking and wakes on the next request, which keeps
+  # this close to free. Suspend rather than stop, so waking is quick and
+  # SQLite is never killed mid-write.
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
