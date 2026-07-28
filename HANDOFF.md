@@ -73,11 +73,15 @@ AGENDA_CALDAV_URL=http://127.0.0.1:5232     # point CalDAV at a test server
 ```
 
 **Chromium alone is not enough for layout.** Both phones here run Safari, and
-it has already disagreed with Chrome on something that mattered: a flex item
-whose content overflows the scrollport measured 312px in Safari against 812
-in Chrome, so an overlay stretched across it covered a third of the week.
-Everything measured perfectly in Chromium while the calendar was visibly
-broken on the owner's phone. Playwright's WebKit is the same engine Safari
+it has already disagreed with Chrome twice, both times inside the week grid's
+horizontal scroller: **Safari resolves intrinsic widths there against the
+scrollport, not the content.** A box sized by `w-max` or by `flex: 1` came out
+356px against Chrome's 856, so anything painted across one — an overlay of
+hour lines, a row's background, the pinned header's underline — stopped a
+third of the way through the week. State the width instead
+(`style={{ minWidth: … }}`) and paint per column rather than across all of
+them. Everything measured perfectly in Chromium while the calendar was
+visibly broken on the owner's phone. Playwright's WebKit is the same engine Safari
 uses — `npx playwright install webkit && npx playwright install-deps webkit`,
 then drive it with the `devices['iPhone 13']` profile. It won't keep the
 session cookie over plain http (the cookie is `secure` in production), so log

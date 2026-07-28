@@ -164,7 +164,19 @@ export function TimeGrid({
       // 44px underneath the axis and clips the text off its blocks.
       style={{ scrollPaddingLeft: AXIS_WIDTH }}
     >
-      <div className="w-max min-w-full">
+      {/* The width is stated rather than left to `w-max`. Safari resolves
+          max-content here to the scrollport's width, so every row inside was
+          356px wide against the week's real 856 — and a row's background or
+          border stopped partway across, leaving the pinned header's underline
+          hanging in mid-air. min-width keeps a wide screen able to stretch. */}
+      <div
+        className="w-full"
+        style={
+          single
+            ? undefined
+            : { minWidth: AXIS_WIDTH + days.length * MIN_COLUMN }
+        }
+      >
         {/* Day headers, pinned to the top of the scroller. */}
         <div className="sticky top-0 z-30 flex border-b border-border bg-surface">
           <div
@@ -183,12 +195,7 @@ export function TimeGrid({
                 aria-label={`${day.weekdayShort} ${day.dayOfMonth}${
                   day.isToday ? ", today" : ""
                 }`}
-                // Each cell paints its own background rather than relying on
-                // the row's. Safari doesn't paint the row's behind them, and
-                // the day column scrolling underneath showed through — the
-                // selected day's tint and its hour lines appearing as a band
-                // beside the date.
-                className={`flex min-w-0 flex-col items-center gap-0.5 border-l border-border bg-surface py-1.5 ${snapClass(
+                className={`flex min-w-0 flex-col items-center gap-0.5 border-l border-border py-1.5 ${snapClass(
                   index,
                 )}`}
                 style={columnStyle}
@@ -282,10 +289,8 @@ export function TimeGrid({
                   createAt(day.day, e.currentTarget, e.clientY);
                 }}
                 onPointerUp={(e) => onColumnPointerUp(day.day, e)}
-                // z-0 rather than the default auto: a column has to stay
-                // under the pinned header and hour axis. Safari let the
-                // selected day's tint — and with it the hour lines — paint
-                // over the header, leaving a stray band beside the date.
+                // z-0 rather than the default auto, so a column always stays
+                // under the pinned header and the hour axis.
                 className={`relative z-0 min-w-0 border-l border-border ${snapClass(
                   index,
                 )} ${!single && index === selected ? "bg-surface-muted/50" : ""}`}
