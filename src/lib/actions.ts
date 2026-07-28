@@ -378,7 +378,11 @@ export async function addHouseholdEvent(
   const startTime = text(form, "start_time", 5);
   const endTime = text(form, "end_time", 5);
   const notes = text(form, "notes", 500) || null;
-  const allDay = !startTime;
+  // The form has an explicit All day toggle. Falling back to "no start time
+  // was given" keeps older submissions working.
+  const allDay = form.has("all_day")
+    ? text(form, "all_day", 1) === "1"
+    : !startTime;
 
   if (!title) return { error: "The event needs a title." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick a date." };

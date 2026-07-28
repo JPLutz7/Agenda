@@ -135,6 +135,88 @@ export function formatDayShort(day: DayKey): string {
   }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
+/* --------------------------------------------------- months and years --- */
+
+export function startOfMonth(day: DayKey): DayKey {
+  return `${day.slice(0, 7)}-01`;
+}
+
+export function addMonths(day: DayKey, n: number): DayKey {
+  const [y, m, d] = day.split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + n, 1));
+  // Clamp to the last valid day: 31 Jan + 1 month is 28 Feb, not 3 March.
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return target.toISOString().slice(0, 10);
+}
+
+export function addYears(day: DayKey, n: number): DayKey {
+  return addMonths(day, n * 12);
+}
+
+export function daysInMonth(day: DayKey): number {
+  const [y, m] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+/**
+ * The full grid a month is drawn on: whole weeks from the Sunday on or before
+ * the 1st, to the Saturday on or after the last day. Always 35 or 42 cells.
+ */
+export function monthGridRange(day: DayKey): { from: DayKey; to: DayKey } {
+  const first = startOfMonth(day);
+  const last = `${day.slice(0, 7)}-${String(daysInMonth(day)).padStart(2, "0")}`;
+  const from = startOfWeek(first);
+  const to = addDays(startOfWeek(last), 6);
+  return { from, to };
+}
+
+export function isSameMonth(a: DayKey, b: DayKey): boolean {
+  return a.slice(0, 7) === b.slice(0, 7);
+}
+
+export function formatMonthLabel(day: DayKey): string {
+  const [y, m] = day.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+export function formatMonthShort(day: DayKey): string {
+  const [y, m] = day.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+/** 'Tuesday, 28 July 2026' — the heading for a single day. */
+export function formatFullDate(day: DayKey): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+/** '7 PM – 8:30 PM', or 'All day'. */
+export function formatTimeRange(
+  startsAt: string,
+  endsAt: string,
+  allDay: boolean,
+  timeZone: string,
+): string {
+  if (allDay) return "All day";
+  return `${formatTime(startsAt, timeZone)} – ${formatTime(endsAt, timeZone)}`;
+}
+
 /** 'in 3 days', 'today', '2 days late' — for chore due dates. */
 export function describeDue(dueOn: DayKey, timeZone: string): string {
   const diff = daysBetween(today(timeZone), dueOn);

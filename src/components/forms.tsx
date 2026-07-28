@@ -44,19 +44,30 @@ export function ActionForm({
   children,
   className = "",
   resetOnSuccess = false,
+  onSuccess,
 }: {
   action: (state: ActionState, form: FormData) => Promise<ActionState>;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
+  /**
+   * Called after the action succeeds. Needed for fields React controls:
+   * form.reset() restores the DOM but can't touch component state, so a
+   * controlled input would keep its old value into the next entry.
+   */
+  onSuccess?: () => void;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(action, {});
   const ref = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (resetOnSuccess && state.ok !== undefined && !state.error) {
-      ref.current?.reset();
+    if (state.ok !== undefined && !state.error) {
+      if (resetOnSuccess) ref.current?.reset();
+      onSuccess?.();
     }
+    // Only re-run when the action reports back, not when the parent
+    // re-renders and hands us a new callback identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, resetOnSuccess]);
 
   return (
