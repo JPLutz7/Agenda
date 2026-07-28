@@ -16,8 +16,17 @@ export default async function HomePage() {
   // awaited — a slow feed shouldn't hold up the page.
   refreshIfStale();
 
-  const { days, chores, people, feeds, accounts, timezone, today } =
-    getDashboard();
+  const {
+    days,
+    chores,
+    people,
+    feeds,
+    accounts,
+    timezone,
+    today,
+    writeCalendar,
+    writableCalendars,
+  } = getDashboard();
   const dueNow = chores.filter((c) => c.overdue || c.dueToday);
 
   // A calendar can arrive two ways — a published link or a connected iCloud
@@ -121,7 +130,12 @@ export default async function HomePage() {
         )}
 
       <div className="mt-6">
-        <AddHouseholdEventForm people={people} defaultDate={today} />
+        <AddHouseholdEventForm
+          people={people}
+          defaultDate={today}
+          calendars={writableCalendars}
+          defaultCalendarId={writeCalendar?.id ?? null}
+        />
       </div>
     </>
   );

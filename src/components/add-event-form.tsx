@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { addHouseholdEvent } from "@/lib/actions";
-import type { Person } from "@/lib/data";
+import type { Person, WritableCalendarOption } from "@/lib/data";
 import {
   ActionForm,
   Disclosure,
@@ -30,17 +30,30 @@ function shiftTime(time: string, minutes: number): string {
  * fills in 7:30, and moving the start moves the end with it, keeping whatever
  * length was set. All-day is its own toggle instead of the old "leave the
  * times blank", which nobody would guess.
+ *
+ * The destination calendar is chosen here, per event. Setup's choice arrives
+ * as `defaultCalendarId` and is only the pre-selection — with no iCloud
+ * account connected there is nowhere to send it, so the picker stays hidden
+ * and the event simply lives in the app.
  */
 export function AddHouseholdEventForm({
   people,
   defaultDate,
+  calendars,
+  defaultCalendarId,
 }: {
   people: Person[];
   defaultDate: string;
+  calendars: WritableCalendarOption[];
+  defaultCalendarId: number | null;
 }) {
   const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+
+  // One person's calendars need no headings; two accounts do, since both are
+  // likely to have a "Home".
+  const accountLabels = [...new Set(calendars.map((c) => c.account_label))];
 
   const onStartChange = (value: string) => {
     if (!value) {
@@ -118,6 +131,7 @@ export function AddHouseholdEventForm({
               <input
                 name="start_time"
                 type="time"
+                required
                 value={start}
                 onChange={(e) => onStartChange(e.target.value)}
                 className={fieldClass}
@@ -138,6 +152,35 @@ export function AddHouseholdEventForm({
         <Field label="Notes">
           <input name="notes" className={fieldClass} placeholder="Optional" />
         </Field>
+
+        {calendars.length > 0 && (
+          <Field label="Add it to">
+            <select
+              name="calendar_id"
+              defaultValue={defaultCalendarId ?? "none"}
+              className={fieldClass}
+            >
+              <option value="none">This app only</option>
+              {accountLabels.length > 1
+                ? accountLabels.map((label) => (
+                    <optgroup key={label} label={label}>
+                      {calendars
+                        .filter((c) => c.account_label === label)
+                        .map((calendar) => (
+                          <option key={calendar.id} value={calendar.id}>
+                            {calendar.display_name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))
+                : calendars.map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.display_name}
+                    </option>
+                  ))}
+            </select>
+          </Field>
+        )}
 
         {people.length > 0 && (
           <input type="hidden" name="created_by" value={people[0].id} />

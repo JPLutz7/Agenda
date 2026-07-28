@@ -195,8 +195,9 @@ export function ICloudSetup({
         <Card className="mt-3 p-4">
           <p className="text-sm font-medium">Where new events go</p>
           <p className="mb-3 mt-1 text-xs text-muted">
-            Events you add in this app get written to this iCloud calendar, so
-            they appear in the Calendar app on both phones. Deleting one here
+            The calendar already chosen for you when you add an event &mdash;
+            you can pick a different one each time. Events written to iCloud
+            appear in the Calendar app on both phones, and deleting one here
             removes it from iCloud too.
           </p>
           <ActionForm action={setWriteCalendar} className="flex gap-2">

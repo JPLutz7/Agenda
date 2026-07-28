@@ -79,37 +79,29 @@ directly rather than through the UI.
 
 Working and deployed: merged calendars, two-way iCloud sync, day/week/month/
 year views with an event detail dialog, chores with rotation, shopping list,
-home-screen install with live refresh.
+home-screen install with live refresh, and a per-event destination calendar on
+the add form.
+
+**Picking the calendar per event.** The add form carries a `calendar_id`
+select, built from `getWritableCalendars()` and pre-selected with the
+`write_calendar_id` setting that Setup still writes. `addHouseholdEvent`
+resolves it through `getWritableCalendar()`, so a read-only or deleted
+calendar is refused rather than written to; a submission with no field at all
+falls back to the Setup default. With no CalDAV account the select isn't
+rendered and events stay local. Deletion needed no change — each row already
+records the calendar it went to.
 
 ## Next task
 
-**Choose the calendar per event, instead of only globally.**
+**Forms lose what was typed when an action returns an error.**
 
-Today a single calendar receives everything the app creates. It's chosen in
-Setup → *Where new events go* and stored as the `write_calendar_id` setting.
+React 19 resets uncontrolled fields once a form action completes, error or
+not, so a rejected submission clears the title, the notes, the feed URL, and
+so on. `ActionForm` in `src/components/forms.tsx` already resets deliberately
+on success (`resetOnSuccess`), which suggests the reset on failure was never
+intended. The add-event form now avoids the worst of it by marking the start
+time `required` so the browser catches it before submitting, but the general
+case is still there: any server-side validation error empties the form.
 
-The goal: pick the destination calendar **each time you add an event**, with
-the Setup choice becoming the pre-selected default rather than the only option.
-
-Relevant code:
-
-| What | Where |
-| --- | --- |
-| Add-event form (client component) | `src/components/add-event-form.tsx` |
-| Rendered on the home page | `src/app/page.tsx` |
-| The action that creates events | `addHouseholdEvent` in `src/lib/actions.ts` |
-| Resolves the single target today | `getWriteCalendar()` in `src/lib/data.ts` |
-| Lists accounts and their calendars | `getCalDavAccounts()` in `src/lib/data.ts` |
-| Setup UI with the current selector | `src/components/icloud-setup.tsx` |
-
-Notes for whoever does it:
-
-- `household_events` already has a `caldav_calendar_id` column, so an event
-  can record which calendar it went to. `removeHouseholdEvent` already reads it
-  to delete remotely, so per-event destinations should work for deletion
-  without change — worth confirming.
-- Calendars marked `read_only` must not be offered.
-- A household may have no CalDAV account at all (feeds only, or nothing yet).
-  The picker should degrade to "this app only" rather than appearing broken.
-- The existing `write_calendar_id` setting should keep working as the default;
-  don't drop it.
+Worth fixing in `ActionForm` — keep the submitted `FormData` and write the
+values back when the action reports an error.

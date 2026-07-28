@@ -340,26 +340,54 @@ export function getCalDavAccounts(): CalDavAccountView[] {
   return accounts.map((a) => ({ ...a, calendars: calendarsFor.all(a.id) }));
 }
 
-/** The calendar that app-created events get written to, if one is chosen. */
-export function getWriteCalendar(): {
+export type WriteTarget = {
   id: number;
   account_id: number;
   url: string;
   display_name: string;
-} | null {
-  const id = getSetting("write_calendar_id");
-  if (!id) return null;
+};
+
+/** A calendar this app is allowed to write to, or null if it isn't one. */
+export function getWritableCalendar(id: number): WriteTarget | null {
+  if (!Number.isInteger(id)) return null;
   return (
     db
-      .prepare<
-        [number],
-        { id: number; account_id: number; url: string; display_name: string }
-      >(
+      .prepare<[number], WriteTarget>(
         `SELECT id, account_id, url, display_name FROM caldav_calendars
          WHERE id = ? AND read_only = 0`,
       )
-      .get(Number(id)) ?? null
+      .get(id) ?? null
   );
+}
+
+/** The calendar that app-created events get written to, if one is chosen. */
+export function getWriteCalendar(): WriteTarget | null {
+  const id = getSetting("write_calendar_id");
+  if (!id) return null;
+  return getWritableCalendar(Number(id));
+}
+
+export type WritableCalendarOption = {
+  id: number;
+  display_name: string;
+  account_label: string;
+};
+
+/**
+ * Every calendar an event could be sent to, for the picker on the add form.
+ * Read-only calendars are left out — iCloud would refuse the write. The
+ * account label rides along because two accounts can each have a "Home".
+ */
+export function getWritableCalendars(): WritableCalendarOption[] {
+  return db
+    .prepare<[], WritableCalendarOption>(
+      `SELECT c.id, c.display_name, a.label AS account_label
+       FROM caldav_calendars c
+       JOIN caldav_accounts a ON a.id = c.account_id
+       WHERE c.read_only = 0
+       ORDER BY a.id, c.display_name`,
+    )
+    .all();
 }
 
 export function getListItems(): { open: ListItem[]; done: ListItem[] } {
@@ -394,5 +422,6 @@ export function getDashboard() {
     feeds: getFeeds(),
     accounts: getCalDavAccounts(),
     writeCalendar: getWriteCalendar(),
+    writableCalendars: getWritableCalendars(),
   };
 }

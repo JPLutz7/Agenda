@@ -12,7 +12,13 @@ import {
   startSession,
   verifyPasscode,
 } from "./auth";
-import { assigneeFor, getPeople, getWriteCalendar, timezone } from "./data";
+import {
+  assigneeFor,
+  getPeople,
+  getWritableCalendar,
+  getWriteCalendar,
+  timezone,
+} from "./data";
 import { addDays, today } from "./dates";
 import { normalizeFeedUrl } from "./ics";
 import {
@@ -386,6 +392,12 @@ export async function addHouseholdEvent(
 
   if (!title) return { error: "The event needs a title." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick a date." };
+  // A timed event with no time used to mean all-day; since the All day toggle
+  // arrived it means the time was simply never filled in, and converting a
+  // blank one throws deep inside the date maths.
+  if (!allDay && !startTime) {
+    return { error: "Give it a start time, or turn on All day." };
+  }
 
   let startsAt: string;
   let endsAt: string;
@@ -405,10 +417,30 @@ export async function addHouseholdEvent(
     }
   }
 
-  // If an iCloud calendar is set as the write target, this event belongs in
-  // iCloud first — that's what makes it show up in the Calendar app on both
-  // phones rather than only here.
-  const writeCalendar = getWriteCalendar();
+  // Where this one goes. The form sends a choice per event, pre-selected with
+  // the Setup default; a submission without the field (an older cached page)
+  // falls back to that default on its own.
+  let writeCalendar;
+  if (!form.has("calendar_id")) {
+    writeCalendar = getWriteCalendar();
+  } else {
+    const choice = text(form, "calendar_id", 20);
+    if (choice === "" || choice === "none") {
+      writeCalendar = null;
+    } else {
+      writeCalendar = getWritableCalendar(Number(choice));
+      if (!writeCalendar) {
+        return {
+          error:
+            "That calendar can't be written to any more. Pick another one, " +
+            "or check it in Setup.",
+        };
+      }
+    }
+  }
+
+  // An iCloud calendar means the event belongs in iCloud first — that's what
+  // makes it show up in the Calendar app on both phones rather than only here.
   let remote: { url: string; etag: string | null } | null = null;
   let uid: string | null = null;
 
