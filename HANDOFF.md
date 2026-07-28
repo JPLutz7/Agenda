@@ -87,6 +87,11 @@ then drive it with the `devices['iPhone 13']` profile. It won't keep the
 session cookie over plain http (the cookie is `secure` in production), so log
 in with Chromium and copy the cookies across with `secure: false`.
 
+Shopping prices are testable the same way: `BESTBUY_API_BASE` points the Best
+Buy client at a stand-in, so the whole path — search, bind a SKU, refresh,
+notice a change — runs for real without a key. Test the no-key state too; it
+is the state the app is actually deployed in.
+
 `src/lib/layout.ts` (event placement) is a pure function and is worth testing
 directly rather than through the UI.
 
