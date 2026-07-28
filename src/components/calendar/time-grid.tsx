@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { blockGeometry, placeEvents } from "@/lib/layout";
 import { textOn } from "@/lib/colors";
 import type { CalDay, CalEvent } from "./types";
@@ -27,6 +31,25 @@ const MIN_COLUMN = 116;
 const TWO_LINE_HEIGHT = 34;
 /** New events land on a quarter hour rather than 10:23. */
 const SLOT_MINUTES = 15;
+
+/**
+ * The hour lines, painted into each day column rather than laid over all of
+ * them at once.
+ *
+ * One absolutely-positioned overlay across the whole week is the obvious way
+ * to draw these, and it measures correctly in Chrome — but the row it sits in
+ * is a flex item whose content is wider than the scrollport, and Safari sizes
+ * that item to the visible width instead. The lines then stop partway across
+ * the week, which is exactly what an iPhone showed. A background on each
+ * column can't disagree with the column it's painted on.
+ */
+const HOUR_LINES = `repeating-linear-gradient(
+  to bottom,
+  var(--border) 0px,
+  var(--border) 1px,
+  transparent 1px,
+  transparent ${HOUR_HEIGHT}px
+)`;
 
 function hourLabel(hour: number): string {
   if (hour === 0) return "";
@@ -104,11 +127,7 @@ export function TimeGrid({
     index === lastIndex ? "snap-end" : "snap-start";
 
   /** A double-click on empty grid, turned into a day and a time. */
-  const createAt = (
-    day: string,
-    target: HTMLElement,
-    clientY: number,
-  ) => {
+  const createAt = (day: string, target: HTMLElement, clientY: number) => {
     const box = target.getBoundingClientRect();
     onCreate(day, timeAt(clientY - box.top, box.height));
   };
@@ -244,88 +263,80 @@ export function TimeGrid({
             ))}
           </div>
 
-          <div className="relative flex flex-1">
-            <div className="pointer-events-none absolute inset-0">
-              {Array.from({ length: 24 }, (_, hour) => (
-                <div
-                  key={hour}
-                  className="absolute inset-x-0 border-t border-border"
-                  style={{ top: hour * HOUR_HEIGHT }}
-                />
-              ))}
-            </div>
-
-            {days.map((day, index) => {
-              const placed = placeEvents(day.events.filter((e) => !e.allDay));
-              return (
-                <div
-                  key={day.day}
-                  onDoubleClick={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    createAt(day.day, e.currentTarget, e.clientY);
-                  }}
-                  onPointerUp={(e) => onColumnPointerUp(day.day, e)}
-                  className={`relative min-w-0 border-l border-border ${snapClass(
-                    index,
-                  )} ${!single && index === selected ? "bg-surface-muted/50" : ""}`}
-                  style={columnStyle}
-                >
-                  {placed.map((event) => {
-                    const { top, height } = blockGeometry(event);
-                    const twoLines = height * DAY_HEIGHT >= TWO_LINE_HEIGHT;
-                    return (
-                      <button
-                        key={event.key}
-                        type="button"
-                        onClick={() => onOpenEvent(event)}
-                        title={`${event.timeLabel} · ${event.summary}`}
-                        aria-label={`${event.timeLabel} ${event.summary}`}
-                        className="absolute overflow-hidden rounded px-1 py-px text-left leading-tight ring-1 ring-inset ring-white/25"
-                        style={{
-                          top: `${top * 100}%`,
-                          height: `${height * 100}%`,
-                          left: `${event.left * 100}%`,
-                          width: `calc(${event.width * 100}% - 2px)`,
-                          backgroundColor: event.color,
-                          color: textOn(event.color),
-                          zIndex: 1 + event.column,
-                        }}
-                      >
-                        {twoLines ? (
-                          <>
-                            <span className="block truncate text-[10px] opacity-90">
-                              {event.timeLabel}
-                            </span>
-                            <span className="block truncate text-[11px] font-medium">
-                              {event.summary}
-                            </span>
-                          </>
-                        ) : (
-                          // Too short for two lines, so combine rather than
-                          // dropping either one.
-                          <span className="block truncate text-[10px] font-medium">
-                            <span className="opacity-90">
-                              {event.compactTimeLabel}
-                            </span>{" "}
+          {/* The day columns sit directly in this row rather than in a
+              wrapper of their own: a nested flex item measured 312px in
+              Safari against 812 in Chrome, and anything positioned against
+              it inherited the mistake. */}
+          {days.map((day, index) => {
+            const placed = placeEvents(day.events.filter((e) => !e.allDay));
+            return (
+              <div
+                key={day.day}
+                onDoubleClick={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  createAt(day.day, e.currentTarget, e.clientY);
+                }}
+                onPointerUp={(e) => onColumnPointerUp(day.day, e)}
+                className={`relative min-w-0 border-l border-border ${snapClass(
+                  index,
+                )} ${!single && index === selected ? "bg-surface-muted/50" : ""}`}
+                style={{ ...columnStyle, backgroundImage: HOUR_LINES }}
+              >
+                {placed.map((event) => {
+                  const { top, height } = blockGeometry(event);
+                  const twoLines = height * DAY_HEIGHT >= TWO_LINE_HEIGHT;
+                  return (
+                    <button
+                      key={event.key}
+                      type="button"
+                      onClick={() => onOpenEvent(event)}
+                      title={`${event.timeLabel} · ${event.summary}`}
+                      aria-label={`${event.timeLabel} ${event.summary}`}
+                      className="absolute overflow-hidden rounded px-1 py-px text-left leading-tight ring-1 ring-inset ring-white/25"
+                      style={{
+                        top: `${top * 100}%`,
+                        height: `${height * 100}%`,
+                        left: `${event.left * 100}%`,
+                        width: `calc(${event.width * 100}% - 2px)`,
+                        backgroundColor: event.color,
+                        color: textOn(event.color),
+                        zIndex: 1 + event.column,
+                      }}
+                    >
+                      {twoLines ? (
+                        <>
+                          <span className="block truncate text-[10px] opacity-90">
+                            {event.timeLabel}
+                          </span>
+                          <span className="block truncate text-[11px] font-medium">
                             {event.summary}
                           </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                        </>
+                      ) : (
+                        // Too short for two lines, so combine rather than
+                        // dropping either one.
+                        <span className="block truncate text-[10px] font-medium">
+                          <span className="opacity-90">
+                            {event.compactTimeLabel}
+                          </span>{" "}
+                          {event.summary}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
 
-                  {day.isToday && nowMinutes !== null && (
-                    <div
-                      className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
-                      style={{ top: `${(nowMinutes / 1440) * 100}%` }}
-                    >
-                      <span className="absolute -left-1 -top-[3px] h-1.5 w-1.5 rounded-full bg-red-500" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                {day.isToday && nowMinutes !== null && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
+                    style={{ top: `${(nowMinutes / 1440) * 100}%` }}
+                  >
+                    <span className="absolute -left-1 -top-[3px] h-1.5 w-1.5 rounded-full bg-red-500" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
