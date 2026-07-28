@@ -1,6 +1,4 @@
-# Fly.io deployment.
-#
-# Change `app` below to the name you claim, then follow DEPLOY.md.
+# Fly.io deployment. See DEPLOY.md.
 #
 # THE ONE RULE: run exactly one machine. The database is a SQLite file on the
 # volume below, and a Fly volume attaches to a single machine. A second machine
@@ -9,7 +7,7 @@
 # broken. `fly launch` offers to create two machines for high availability.
 # Say no. See `fly scale count 1` in DEPLOY.md.
 
-app = "agenda"
+app = "agenda-nd"
 
 # Chicago — the closest Fly region to South Bend, about 90 miles away.
 # The volume must be created in this same region.

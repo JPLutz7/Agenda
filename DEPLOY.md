@@ -36,11 +36,11 @@ curl -L https://fly.io/install.sh | sh      # macOS/Linux
 fly auth signup                             # or: fly auth login
 ```
 
-### 2. Pick a name
+### 2. The app name
 
-App names are global, so `agenda` is long gone. Edit `app` in `fly.toml` to
-something like `agenda-<yourlastname>`. Your URL becomes
-`https://<that-name>.fly.dev`.
+Already set: `fly.toml` says `app = "agenda-nd"`, so the app lives at
+`https://agenda-nd.fly.dev`. If you ever rename it in Fly, change it here too —
+`fly deploy` reads this file to decide what it's deploying to.
 
 Leave `primary_region = "ord"` alone unless you move — that's Chicago, the
 closest region to Notre Dame.
@@ -48,7 +48,7 @@ closest region to Notre Dame.
 ### 3. Create the app and its volume
 
 ```bash
-fly apps create <your-app-name>
+fly apps create agenda-nd
 fly volumes create agenda_data --size 1 --region ord --yes
 ```
 
@@ -57,11 +57,18 @@ match `primary_region`** — a volume in the wrong region simply won't attach.
 
 ### 4. Set the session secret
 
-Without this, everyone gets signed out whenever the database is rebuilt.
-
 ```bash
 fly secrets set AGENDA_SECRET=$(openssl rand -hex 32)
 ```
+
+This does two jobs: it signs session cookies, and it derives the key that
+encrypts stored iCloud app-specific passwords. Connecting an iCloud account is
+refused outright until it's set.
+
+**Set it once and leave it.** Rotating it later makes every stored iCloud
+password permanently undecryptable — you'd have to reconnect both accounts —
+and signs everyone out. Fly won't show the value back, so save a copy in your
+password manager now if you want one.
 
 ### 5. Deploy
 
@@ -133,8 +140,9 @@ Two things are then on you:
 
 | Variable | Needed? | What it's for |
 | --- | --- | --- |
-| `AGENDA_SECRET` | Set it in production | Signs session cookies. Without it, one is generated and stored in the database, so rebuilding the database signs everyone out. |
+| `AGENDA_SECRET` | Required | Signs session cookies and encrypts stored iCloud passwords. Without it, iCloud accounts can't be connected at all, and the cookie key falls back to one kept in the database — so rebuilding the database signs everyone out. |
 | `AGENDA_DB_PATH` | Set by `fly.toml`/Dockerfile | Where the SQLite file lives. Must be on the persistent volume. |
+| `AGENDA_CALDAV_URL` | Optional | Defaults to iCloud. Change it for Fastmail or a self-hosted CalDAV server. |
 | `AGENDA_CRON_SECRET` | Optional | Enables `GET /api/refresh` for an external scheduler. The app already refreshes itself when opened. |
 
 ## If something's wrong
