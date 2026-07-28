@@ -19,6 +19,8 @@ export type CalEvent = {
   endMinutes: number;
   /** '7 PM' or 'All day'. */
   timeLabel: string;
+  /** '7p' — for chips too narrow for the full time. */
+  compactTimeLabel: string;
   /** '7 PM – 8:30 PM' or 'All day'. */
   rangeLabel: string;
   /** 'Tuesday, July 28, 2026'. */

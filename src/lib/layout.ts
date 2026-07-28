@@ -34,8 +34,11 @@ const CASCADE_STEP = 0.16;
 /** Past this many, further events stack in place rather than vanishing. */
 const MAX_CASCADE = 3;
 
-/** Very short events still need to be tappable. */
-const MIN_VISUAL_MINUTES = 20;
+/**
+ * Every block has to be tall enough for a line of text, since the title and
+ * time must stay readable however brief the event is.
+ */
+const MIN_VISUAL_MINUTES = 30;
 
 function visualEnd(event: Placeable): number {
   return Math.max(event.endMinutes, event.startMinutes + MIN_VISUAL_MINUTES);

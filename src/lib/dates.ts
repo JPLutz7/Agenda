@@ -99,6 +99,25 @@ export function formatTime(iso: string, timeZone: string): string {
   return fmt.format(new Date(iso)).replace(":00", "");
 }
 
+/**
+ * '7p', '8:30a' — for places with room for a time but not for '8:30 AM',
+ * like a chip inside a month cell.
+ */
+export function formatTimeCompact(iso: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const minute = get("minute");
+  const suffix = get("dayPeriod").toLowerCase().startsWith("a") ? "a" : "p";
+  return minute === "00"
+    ? `${get("hour")}${suffix}`
+    : `${get("hour")}:${minute}${suffix}`;
+}
+
 /** Minutes from local midnight — the y-offset for an event in the week grid. */
 export function minutesIntoDay(iso: string, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {

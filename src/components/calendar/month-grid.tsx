@@ -3,8 +3,12 @@
 import type { CalDay, CalEvent } from "./types";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-/** More than this in one cell and the day number stops being readable. */
-const MAX_CHIPS = 3;
+/**
+ * Two, because each chip carries the time *and* the title on separate lines.
+ * Sharing one line in a ~46px cell left the title about two characters — the
+ * time was legible and the title may as well not have been there.
+ */
+const MAX_CHIPS = 2;
 
 /**
  * A month at a glance: whole weeks, so the grid is always rectangular, with
@@ -46,7 +50,7 @@ export function MonthGrid({
           return (
             <div
               key={day.day}
-              className={`min-h-[62px] min-w-0 border-b border-l border-border p-0.5 first:border-l-0 ${
+              className={`min-h-[92px] min-w-0 border-b border-l border-border p-0.5 first:border-l-0 ${
                 isSelected && !day.isToday ? "bg-surface-muted" : ""
               } ${day.inFocus ? "" : "opacity-40"}`}
             >
@@ -82,9 +86,19 @@ export function MonthGrid({
                     onClick={() => onOpenEvent(event)}
                     title={`${event.timeLabel} · ${event.summary}`}
                     aria-label={`${event.timeLabel} ${event.summary}`}
-                    className="block h-[9px] w-full rounded-[2px]"
+                    className="block w-full rounded-[2px] px-0.5 py-px text-left text-[8px] leading-[10px] text-white"
                     style={{ backgroundColor: event.color }}
-                  />
+                  >
+                    {/* A month cell is ~46px wide. The time is abbreviated to
+                        '7p' and given its own line so the title gets the full
+                        width rather than the few characters left over. */}
+                    <span className="block truncate opacity-90">
+                      {event.allDay ? "all day" : event.compactTimeLabel}
+                    </span>
+                    <span className="block truncate font-medium">
+                      {event.summary}
+                    </span>
+                  </button>
                 ))}
                 {overflow > 0 && (
                   <button

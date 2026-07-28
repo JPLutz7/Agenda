@@ -10,6 +10,7 @@ import {
   formatFullDate,
   formatMonthLabel,
   formatTime,
+  formatTimeCompact,
   formatTimeRange,
   isSameMonth,
   minutesIntoDay,
@@ -119,6 +120,9 @@ export default async function CalendarPage({
       startMinutes,
       endMinutes,
       timeLabel: event.allDay ? "All day" : formatTime(event.startsAt, tz),
+      compactTimeLabel: event.allDay
+        ? "All day"
+        : formatTimeCompact(event.startsAt, tz),
       rangeLabel: formatTimeRange(
         event.startsAt,
         event.endsAt,
