@@ -22,9 +22,13 @@ export async function register() {
   // Imported lazily so the native better-sqlite3 module is never pulled into
   // a build or edge bundle.
   const { syncAllFeeds } = await import("./lib/sync");
+  const { refreshWantPrices } = await import("./lib/prices");
 
   const run = async () => {
     try {
+      // Want prices ride along with the calendar sync; they only move on the
+      // retailer's schedule, and the stale check inside keeps it cheap.
+      await refreshWantPrices({ onlyStale: true }).catch(() => undefined);
       const results = await syncAllFeeds();
       const failed = results.filter((r) => r.error);
       if (failed.length > 0) {

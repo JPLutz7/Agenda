@@ -143,6 +143,28 @@ take half each, three a third (`placeEvents`). The week used to carry a blank
 spacer after Sunday so every column could snap; the last column now snaps to
 the scrollport's end instead, so the grid stops where the week does.
 
+**Shopping list: Wants and Needs.** Two categories, priced by different
+means because groceries and televisions are different problems.
+
+*Needs* (method 1) remember what you paid: type the price when you tick an
+item off, and it shows "last time $4.29" next time, with a trip estimate and a
+monthly total. No API — nothing covers Aldi or Martin's, and a price from a
+shop you're not standing in is worse than none.
+
+*Wants* (method 2) are looked up from Best Buy's Products API
+(`src/lib/bestbuy.ts`, `src/lib/prices.ts`). A Want is stored as a *search*
+until the first check binds it to a SKU; after that it refreshes by SKU so the
+price can't drift onto a different product. `price_history` records only
+actual movement, which is what powers "↓ $100 since last check". Refreshes
+piggyback on the calendar sync, six-hour staleness.
+
+Needs `BESTBUY_API_KEY` (free, developer.bestbuy.com). Without it the Wants
+list still works and says plainly why there's no price, rather than showing a
+stale number as though it were current — there is a test for exactly that.
+`BESTBUY_API_BASE` overrides the host so the price path can be tested against
+a stand-in. The first Want, the LG 48" B5 OLED, is seeded once in `db.ts` with
+no SKU on purpose: Best Buy's catalogue decides which product it is.
+
 ## Worth a decision
 
 **Four-way overlaps are unreadable again.** Splitting a column evenly means

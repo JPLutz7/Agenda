@@ -1,31 +1,101 @@
+import Link from "next/link";
 import { requireSignedIn } from "@/lib/guard";
-import { getListItems, getPeople } from "@/lib/data";
-import { addListItem, clearCheckedItems, toggleListItem } from "@/lib/actions";
+import {
+  getListItems,
+  getNeedsEstimate,
+  getPeople,
+  getSpentThisMonth,
+} from "@/lib/data";
+import { addListItem, clearCheckedItems } from "@/lib/actions";
+import { hasApiKey, nearbyStores, DEFAULT_POSTAL_CODE } from "@/lib/bestbuy";
+import { refreshPricesIfStale } from "@/lib/prices";
 import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
-import { Empty, PageHeader } from "@/components/ui";
+import { Needs } from "@/components/list/needs";
+import { Wants } from "@/components/list/wants";
+import { money } from "@/components/list/money";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function ListPage() {
+type Tab = "needs" | "wants";
+
+/**
+ * Nearest Best Buy to South Bend, looked up once per render and only when a
+ * key exists. Failure is silent — it's a nicety, not the point of the page.
+ */
+async function nearestStoreLabel(): Promise<string | null> {
+  if (!hasApiKey()) return null;
+  try {
+    const [store] = await nearbyStores(DEFAULT_POSTAL_CODE);
+    if (!store) return null;
+    return `${store.city} (${store.distanceMiles} mi)`;
+  } catch {
+    return null;
+  }
+}
+
+export default async function ListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   await requireSignedIn();
+  // Wants go stale on their own schedule; nudge a background refresh.
+  refreshPricesIfStale();
+
+  const params = await searchParams;
+  const tab: Tab = params.tab === "wants" ? "wants" : "needs";
+
   const { open, done } = getListItems();
   const people = getPeople();
+  const estimate = getNeedsEstimate();
+  const spent = getSpentThisMonth();
+
+  const needsOpen = open.filter((i) => i.category !== "want");
+  const needsDone = done.filter((i) => i.category !== "want");
+  const wantsOpen = open.filter((i) => i.category === "want");
+  const wantsDone = done.filter((i) => i.category === "want");
+
+  const store = tab === "wants" ? await nearestStoreLabel() : null;
+
+  const tabClass = (which: Tab) =>
+    `flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium transition-colors ${
+      which === tab
+        ? "bg-accent text-white"
+        : "text-muted hover:text-foreground"
+    }`;
 
   return (
     <>
       <PageHeader
         title="Shopping list"
-        subtitle="Whatever the apartment is out of."
+        subtitle={
+          tab === "needs"
+            ? "What the apartment is out of."
+            : "Things you're saving up for."
+        }
       />
 
+      <div className="mb-4 flex rounded-lg border border-border bg-surface p-0.5">
+        <Link href="/list" className={tabClass("needs")}>
+          Needs {needsOpen.length > 0 ? `(${needsOpen.length})` : ""}
+        </Link>
+        <Link href="/list?tab=wants" className={tabClass("wants")}>
+          Wants {wantsOpen.length > 0 ? `(${wantsOpen.length})` : ""}
+        </Link>
+      </div>
+
       <ActionForm action={addListItem} className="mb-5" resetOnSuccess>
+        <input type="hidden" name="category" value={tab === "wants" ? "want" : "need"} />
         <div className="flex gap-2">
           <input
             name="text"
             required
             autoComplete="off"
             className={fieldClass}
-            placeholder="Paper towels"
+            placeholder={
+              tab === "needs" ? "Paper towels" : 'LG 48" OLED evo B5'
+            }
           />
           {people.length > 0 && (
             <select
@@ -43,78 +113,44 @@ export default async function ListPage() {
           )}
           <SubmitButton>Add</SubmitButton>
         </div>
+        {tab === "wants" && (
+          <p className="mt-2 text-xs text-muted">
+            Word it the way Best Buy lists it and the price will find itself.
+          </p>
+        )}
       </ActionForm>
 
-      {open.length === 0 ? (
-        <Empty>Nothing on the list.</Empty>
-      ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-          {open.map((item) => (
-            <li key={item.id} className="flex items-center gap-3 px-2 py-1">
-              {/* min-w-0: a flex child won't shrink below its content by
-                  default, so a long item name pushes the row wider than the
-                  card instead of truncating inside it. */}
-              <form
-                action={toggleListItem.bind(null, item.id)}
-                className="min-w-0 flex-1"
-              >
-                <button
-                  type="submit"
-                  className="flex w-full items-center gap-3 px-2 py-2 text-left"
-                >
-                  <span className="h-4 w-4 shrink-0 rounded border border-muted" />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {item.text}
-                  </span>
-                  {item.added_by_name && (
-                    <span
-                      className="shrink-0 text-xs"
-                      style={{ color: item.added_by_color ?? undefined }}
-                    >
-                      {item.added_by_name}
-                    </span>
-                  )}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {done.length > 0 && (
+      {tab === "needs" ? (
         <>
-          <div className="mb-2 mt-7 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
-              In the cart ({done.length})
-            </h2>
-            <form action={clearCheckedItems}>
+          <Needs open={needsOpen} done={needsDone} estimate={estimate} />
+          {spent > 0 && (
+            <p className="mt-4 px-1 text-xs text-muted">
+              Spent on groceries this month: {money(spent)}
+            </p>
+          )}
+          {needsDone.length > 0 && (
+            <form action={clearCheckedItems.bind(null, "need")} className="mt-3">
               <SubmitButton variant="danger" className="px-2 py-1">
-                Clear
+                Clear the cart
               </SubmitButton>
             </form>
-          </div>
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-            {done.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 px-2 py-1">
-                <form
-                  action={toggleListItem.bind(null, item.id)}
-                  className="flex-1"
-                >
-                  <button
-                    type="submit"
-                    className="flex w-full items-center gap-3 px-2 py-2 text-left"
-                  >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-[10px] text-white">
-                      ✓
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-muted line-through">
-                      {item.text}
-                    </span>
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
+          )}
+        </>
+      ) : (
+        <>
+          <Wants
+            open={wantsOpen}
+            done={wantsDone}
+            hasApiKey={hasApiKey()}
+            nearestStore={store}
+          />
+          {wantsDone.length > 0 && (
+            <form action={clearCheckedItems.bind(null, "want")} className="mt-3">
+              <SubmitButton variant="danger" className="px-2 py-1">
+                Clear bought
+              </SubmitButton>
+            </form>
+          )}
         </>
       )}
     </>

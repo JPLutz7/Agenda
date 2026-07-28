@@ -183,8 +183,41 @@ function migrate(db: Database.Database) {
       text       TEXT NOT NULL,
       added_by   INTEGER REFERENCES people(id) ON DELETE SET NULL,
       checked_at TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+
+      -- 'need' (groceries and the like) or 'want' (a tracked purchase).
+      -- The two are priced by completely different means: a need remembers
+      -- what you last paid, a want is looked up from a retailer.
+      category   TEXT NOT NULL DEFAULT 'need',
+
+      -- Needs: the last price typed in when the item was ticked off.
+      last_price_cents INTEGER,
+      last_price_at    TEXT,
+
+      -- Wants: the product this is bound to at a retailer. retailer_query is
+      -- what to search for until a sku is found; once bound, the sku is used.
+      retailer            TEXT,
+      retailer_query      TEXT,
+      retailer_sku        TEXT,
+      retailer_url        TEXT,
+      retailer_name       TEXT,
+      price_cents         INTEGER,
+      regular_price_cents INTEGER,
+      price_checked_at    TEXT,
+      price_error         TEXT
     );
+
+    -- Every price ever seen, from either method. Enough to say "cheaper than
+    -- last time" without keeping a second copy of the current price.
+    CREATE TABLE IF NOT EXISTS price_history (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id     INTEGER NOT NULL REFERENCES list_items(id) ON DELETE CASCADE,
+      price_cents INTEGER NOT NULL,
+      source      TEXT NOT NULL,  -- 'manual' | retailer name
+      recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS price_history_item_idx
+      ON price_history(item_id, recorded_at DESC);
 
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
@@ -218,6 +251,32 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // The shopping list gained Wants and Needs, and the price columns each of
+  // them is tracked by. Same idempotent add as above.
+  const listColumns = columnsOf(db, "list_items");
+  for (const [name, type] of [
+    ["category", "TEXT NOT NULL DEFAULT 'need'"],
+    ["last_price_cents", "INTEGER"],
+    ["last_price_at", "TEXT"],
+    ["retailer", "TEXT"],
+    ["retailer_query", "TEXT"],
+    ["retailer_sku", "TEXT"],
+    ["retailer_url", "TEXT"],
+    ["retailer_name", "TEXT"],
+    ["price_cents", "INTEGER"],
+    ["regular_price_cents", "INTEGER"],
+    ["price_checked_at", "TEXT"],
+    ["price_error", "TEXT"],
+  ] as const) {
+    if (listColumns.includes(name)) continue;
+    try {
+      db.exec(`ALTER TABLE list_items ADD COLUMN ${name} ${type}`);
+    } catch (err) {
+      if (!/duplicate column name/i.test(String(err))) throw err;
+    }
+  }
+
+  seedFirstWant(db);
   applyRequestedColors(db);
 }
 
@@ -230,6 +289,31 @@ function migrate(db: Database.Database) {
  * Runs once and leaves a marker, so colours changed in Setup afterwards are
  * never overwritten. A name that matches nothing is left alone.
  */
+/**
+ * The first Want, added once.
+ *
+ * No SKU here on purpose. Best Buy's catalogue is the authority on which
+ * product this is, so the item is stored as a search and the first price
+ * check binds whatever it finds — which also means it can't be wrong about a
+ * model number I guessed at.
+ */
+function seedFirstWant(db: Database.Database) {
+  const marker = "seeded_first_want";
+  const done = db
+    .prepare<[string], { value: string }>(
+      "SELECT value FROM settings WHERE key = ?",
+    )
+    .get(marker);
+  if (done) return;
+
+  db.prepare(
+    `INSERT INTO list_items (text, category, retailer, retailer_query)
+     VALUES (?, 'want', 'bestbuy', ?)`,
+  ).run('LG 48" OLED evo B5', 'LG 48 class B5 series OLED evo 4K smart TV');
+
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, '1')").run(marker);
+}
+
 function applyRequestedColors(db: Database.Database) {
   const marker = "requested_colors_applied";
   const done = db

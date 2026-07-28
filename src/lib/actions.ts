@@ -37,6 +37,7 @@ import {
   type StoredAccount,
 } from "./caldav";
 import { canStoreSecrets, encryptSecret } from "./secrets";
+import { refreshOneWant, refreshWantPrices } from "./prices";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -688,6 +689,15 @@ export async function removeChore(choreId: number): Promise<void> {
 
 /* -------------------------------------------------------------------- list */
 
+/** Dollars as typed ("4.29", "$4.29") to whole cents. */
+function priceToCents(raw: string): number | null {
+  const cleaned = raw.replace(/[^0-9.]/g, "");
+  if (!cleaned) return null;
+  const value = Number(cleaned);
+  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) return null;
+  return Math.round(value * 100);
+}
+
 export async function addListItem(
   _prev: ActionState,
   form: FormData,
@@ -695,13 +705,74 @@ export async function addListItem(
   await requireSession();
   const itemText = text(form, "text", 200);
   const addedBy = Number(text(form, "added_by", 20)) || null;
+  const category = text(form, "category", 10) === "want" ? "want" : "need";
   if (!itemText) return { error: "" };
-  db.prepare("INSERT INTO list_items (text, added_by) VALUES (?, ?)").run(
-    itemText,
-    addedBy,
-  );
+
+  if (category === "need") {
+    db.prepare(
+      "INSERT INTO list_items (text, added_by, category) VALUES (?, ?, 'need')",
+    ).run(itemText, addedBy);
+    refreshViews();
+    return { ok: "" };
+  }
+
+  // A Want is stored as a search until a price check binds it to a real SKU,
+  // so nothing here has to know Best Buy's model numbering.
+  const info = db
+    .prepare(
+      `INSERT INTO list_items (text, added_by, category, retailer, retailer_query)
+       VALUES (?, ?, 'want', 'bestbuy', ?)`,
+    )
+    .run(itemText, addedBy, text(form, "search", 200) || itemText);
+
+  const result = await refreshOneWant(Number(info.lastInsertRowid));
+  refreshViews();
+  if (result.error) {
+    // The item is kept either way — it's still something they want, it just
+    // has no price yet.
+    return { ok: `Added "${itemText}". ${result.error}` };
+  }
+  return { ok: `Added "${itemText}".` };
+}
+
+/** Record what a Need actually cost, when ticking it off. */
+export async function setItemPrice(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+  const itemId = Number(text(form, "item_id", 20));
+  const cents = priceToCents(text(form, "price", 20));
+  if (!itemId) return { error: "" };
+  if (cents === null) return { error: "That doesn't look like a price." };
+
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE list_items
+       SET last_price_cents = ?, last_price_at = datetime('now')
+       WHERE id = ?`,
+    ).run(cents, itemId);
+    db.prepare(
+      "INSERT INTO price_history (item_id, price_cents, source) VALUES (?, ?, 'manual')",
+    ).run(itemId, cents);
+  })();
+
   refreshViews();
   return { ok: "" };
+}
+
+/** Check one Want's price now. */
+export async function checkWantPrice(itemId: number): Promise<void> {
+  await requireSession();
+  await refreshOneWant(itemId);
+  refreshViews();
+}
+
+/** Check every Want. */
+export async function checkAllWantPrices(): Promise<void> {
+  await requireSession();
+  await refreshWantPrices();
+  refreshViews();
 }
 
 export async function toggleListItem(itemId: number): Promise<void> {
@@ -714,8 +785,12 @@ export async function toggleListItem(itemId: number): Promise<void> {
   refreshViews();
 }
 
-export async function clearCheckedItems(): Promise<void> {
+export async function clearCheckedItems(
+  category: "need" | "want" = "need",
+): Promise<void> {
   await requireSession();
-  db.prepare("DELETE FROM list_items WHERE checked_at IS NOT NULL").run();
+  db.prepare(
+    "DELETE FROM list_items WHERE checked_at IS NOT NULL AND category = ?",
+  ).run(category);
   refreshViews();
 }

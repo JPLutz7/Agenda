@@ -58,12 +58,29 @@ export type ChoreView = {
   lastDoneAt: string | null;
 };
 
+export type ListCategory = "need" | "want";
+
 export type ListItem = {
   id: number;
   text: string;
+  category: ListCategory;
   checked_at: string | null;
   added_by_name: string | null;
   added_by_color: string | null;
+  /** Needs: what it cost the last time it was ticked off. */
+  last_price_cents: number | null;
+  last_price_at: string | null;
+  /** Wants: the bound product and its current price. */
+  retailer: string | null;
+  retailer_sku: string | null;
+  retailer_url: string | null;
+  retailer_name: string | null;
+  price_cents: number | null;
+  regular_price_cents: number | null;
+  price_checked_at: string | null;
+  price_error: string | null;
+  /** The price before the current one, so a change can be shown. */
+  previous_price_cents: number | null;
 };
 
 export function timezone(): string {
@@ -481,8 +498,16 @@ export function getWritableCalendars(): WritableCalendarOption[] {
 export function getListItems(): { open: ListItem[]; done: ListItem[] } {
   const rows = db
     .prepare<[], ListItem>(
-      `SELECT l.id, l.text, l.checked_at,
-              p.name AS added_by_name, p.color AS added_by_color
+      `SELECT l.id, l.text, l.category, l.checked_at,
+              l.last_price_cents, l.last_price_at,
+              l.retailer, l.retailer_sku, l.retailer_url, l.retailer_name,
+              l.price_cents, l.regular_price_cents, l.price_checked_at,
+              l.price_error,
+              p.name AS added_by_name, p.color AS added_by_color,
+              (SELECT h.price_cents FROM price_history h
+                WHERE h.item_id = l.id
+                ORDER BY h.recorded_at DESC LIMIT 1 OFFSET 1)
+                AS previous_price_cents
        FROM list_items l
        LEFT JOIN people p ON p.id = l.added_by
        ORDER BY l.created_at`,
@@ -492,6 +517,39 @@ export function getListItems(): { open: ListItem[]; done: ListItem[] } {
     open: rows.filter((r) => !r.checked_at),
     done: rows.filter((r) => r.checked_at),
   };
+}
+
+/**
+ * What the open Needs are likely to cost, from what was last paid.
+ *
+ * Only items with a remembered price count towards the estimate; `unpriced`
+ * says how many are missing, so a total of $12 next to a list of thirty
+ * things can't be mistaken for the real figure.
+ */
+export function getNeedsEstimate(): { totalCents: number; unpriced: number } {
+  const row = db
+    .prepare<[], { total: number | null; unpriced: number }>(
+      `SELECT SUM(last_price_cents) AS total,
+              SUM(CASE WHEN last_price_cents IS NULL THEN 1 ELSE 0 END) AS unpriced
+       FROM list_items
+       WHERE category = 'need' AND checked_at IS NULL`,
+    )
+    .get()!;
+  return { totalCents: row.total ?? 0, unpriced: row.unpriced ?? 0 };
+}
+
+/** What's actually been spent on Needs so far this month. */
+export function getSpentThisMonth(): number {
+  const row = db
+    .prepare<[], { total: number | null }>(
+      `SELECT SUM(h.price_cents) AS total
+       FROM price_history h
+       JOIN list_items l ON l.id = h.item_id
+       WHERE h.source = 'manual'
+         AND strftime('%Y-%m', h.recorded_at) = strftime('%Y-%m', 'now')`,
+    )
+    .get()!;
+  return row.total ?? 0;
 }
 
 /** Everything the home screen needs, in one pass. */
