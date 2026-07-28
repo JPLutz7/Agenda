@@ -4,6 +4,7 @@ import { HOUSEHOLD_COLOR } from "./colors";
 import {
   DEFAULT_TIMEZONE,
   addDays,
+  daysBetween,
   describeDue,
   eventDayKey,
   today,
@@ -39,7 +40,7 @@ export type AgendaEvent = {
   allDay: boolean;
   personName: string | null;
   color: string;
-  source: "feed" | "household";
+  source: "feed" | "household" | "chore";
   householdId: number | null;
 };
 
@@ -90,11 +91,94 @@ export function getFeeds(): Feed[] {
 }
 
 /**
- * Every event overlapping [from, to], from the iCloud feeds and from the
- * household calendar, merged and sorted. All-day events sort first within a
- * day, which is how a calendar is expected to read.
+ * Chores, as all-day entries on the calendar.
+ *
+ * These are generated from the rotation rather than stored as events, and
+ * deliberately so: a chore's due date moves every time someone marks it done,
+ * so any copy written ahead of time would be wrong within a week. Deriving
+ * them on read means the calendar can never disagree with the Chores tab.
+ *
+ * Future turns are projected forward by the cadence, and the assignee is
+ * projected with them — so you can see whose turn the bins are in a
+ * fortnight, not just this week.
  */
-export function getEvents(from: DayKey, to: DayKey): AgendaEvent[] {
+export function getChoreEvents(from: DayKey, to: DayKey): AgendaEvent[] {
+  const people = getPeople();
+  const chores = db
+    .prepare<
+      [],
+      {
+        id: number;
+        title: string;
+        cadence_days: number;
+        rotates: number;
+        fixed_owner_id: number | null;
+        next_due_on: string;
+        rotation_index: number;
+      }
+    >(
+      `SELECT id, title, cadence_days, rotates, fixed_owner_id,
+              next_due_on, rotation_index
+       FROM chores WHERE archived = 0`,
+    )
+    .all();
+
+  const out: AgendaEvent[] = [];
+
+  for (const chore of chores) {
+    const cadence = Math.max(1, chore.cadence_days);
+    let day = chore.next_due_on;
+    let turn = 0;
+
+    // Jump straight to the window rather than stepping a day at a time from
+    // whenever the chore was created.
+    if (day < from) {
+      const skipped = Math.floor(daysBetween(day, from) / cadence);
+      day = addDays(day, skipped * cadence);
+      turn = skipped;
+    }
+
+    // The bound is belt and braces: a one-day cadence over a month grid is
+    // only ~42 turns, but nothing here should be able to loop away.
+    for (let guard = 0; day <= to && guard < 400; guard++) {
+      if (day >= from) {
+        const assignee = assigneeFor(
+          { ...chore, rotation_index: chore.rotation_index + turn },
+          people,
+        );
+        out.push({
+          key: `c${chore.id}-${day}`,
+          summary: chore.title,
+          location: null,
+          startsAt: day,
+          endsAt: addDays(day, 1),
+          allDay: true,
+          personName: assignee?.name ?? null,
+          // Apartment colour: a chore belongs to the flat, whoever's turn it
+          // happens to be.
+          color: HOUSEHOLD_COLOR,
+          source: "chore" as const,
+          householdId: null,
+        });
+      }
+      day = addDays(day, cadence);
+      turn += 1;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Every event overlapping [from, to] — the iCloud feeds, the household
+ * calendar, and optionally the chore rotation — merged and sorted. All-day
+ * events sort first within a day, which is how a calendar is expected to read.
+ */
+export function getEvents(
+  from: DayKey,
+  to: DayKey,
+  { includeChores = false }: { includeChores?: boolean } = {},
+): AgendaEvent[] {
   const tz = timezone();
   // Generous instant bounds — the exact day filtering happens below in the
   // household timezone, which SQL has no notion of.
@@ -181,6 +265,9 @@ export function getEvents(from: DayKey, to: DayKey): AgendaEvent[] {
       source: "household" as const,
       householdId: r.id,
     })),
+    // Off by default: the Today screen lists what's due in its own section,
+    // and having each chore appear twice on one screen helps nobody.
+    ...(includeChores ? getChoreEvents(from, to) : []),
   ];
 
   return events

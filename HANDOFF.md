@@ -122,10 +122,36 @@ account's events take comes from the person it's assigned to, changeable per
 account in Setup (`setAccountPerson`); unassigned accounts read as the
 apartment.
 
+**Chores on the calendar.** `getChoreEvents()` in `data.ts` turns the rotation
+into all-day entries in the apartment colour, projected forward by each
+chore's cadence with the assignee projected alongside — so you can see whose
+turn the bins are in a fortnight. They are *derived on read*, never stored: a
+chore's due date moves every time someone marks it done, so a written copy
+would be wrong within a week and the calendar could disagree with the Chores
+tab. `getEvents()` takes `{ includeChores }`, on only for the calendar page —
+the Today screen already lists what's due in its own section, and one screen
+showing each chore twice helps nobody. They aren't pushed to iCloud; doing
+that would mean reconciling remote events on every completion.
+
+The headers and the all-day row pin to the top of the grid as one band. They
+used to be separate, so opening on the morning hours scrolled an all-day event
+out of sight — which for a chore, whose only presence on the grid is that row,
+meant it may as well not have been there.
+
 **The week grid.** Overlapping events divide their day evenly — two abreast
 take half each, three a third (`placeEvents`). The week used to carry a blank
 spacer after Sunday so every column could snap; the last column now snaps to
 the scrollport's end instead, so the grid stops where the week does.
+
+## Worth a decision
+
+**Four-way overlaps are unreadable again.** Splitting a column evenly means
+four overlapping events get a quarter of 116px each — 27px, narrower than a
+character, so those blocks show no text. That directly conflicts with the
+owner's instruction that "the title and time for the events should always be
+apparent on the calendar". The cascade this replaced kept every block at least
+52% wide but never reached the right edge. Neither is free; the owner should
+pick. Two or three abreast are fine either way.
 
 ## Next task
 

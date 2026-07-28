@@ -89,7 +89,9 @@ export function EventModal({
                 <dd className="min-w-0 flex-1">
                   {event.source === "household"
                     ? "Added in this app"
-                    : "Your calendar"}
+                    : event.source === "chore"
+                      ? "Chore rotation"
+                      : "Your calendar"}
                 </dd>
               </div>
             </dl>
@@ -101,6 +103,12 @@ export function EventModal({
                     Delete event
                   </SubmitButton>
                 </form>
+              ) : event.source === "chore" ? (
+                // A chore's date is owned by the rotation, so it can't be
+                // edited here without the two disagreeing.
+                <span className="text-xs text-muted">
+                  Manage this on the Chores tab
+                </span>
               ) : (
                 <span className="text-xs text-muted">
                   Edit this one in your Calendar app

@@ -25,7 +25,7 @@ export type CalEvent = {
   rangeLabel: string;
   /** 'Tuesday, July 28, 2026'. */
   dateLabel: string;
-  source: "feed" | "household";
+  source: "feed" | "household" | "chore";
   /** Set only for events this app created, which it can also delete. */
   householdId: number | null;
 };

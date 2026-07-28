@@ -106,7 +106,9 @@ export default async function CalendarPage({
   // Year view needs no events, and asking for a year of them would be wasted
   // work — it only ever shows month names and today.
   const grouped =
-    scale === "year" ? [] : groupByDay(getEvents(from, to), from, to);
+    scale === "year"
+      ? []
+      : groupByDay(getEvents(from, to, { includeChores: true }), from, to);
 
   const toCalEvent = (
     event: ReturnType<typeof getEvents>[number],

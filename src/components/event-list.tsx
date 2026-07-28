@@ -20,6 +20,7 @@ export function EventRow({
           {event.allDay ? "All day" : formatTime(event.startsAt, timeZone)}
           {event.personName ? ` · ${event.personName}` : ""}
           {event.source === "household" ? " · Apartment" : ""}
+          {event.source === "chore" ? " · Chore" : ""}
           {event.location ? ` · ${event.location}` : ""}
         </p>
       </div>

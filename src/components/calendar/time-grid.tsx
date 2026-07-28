@@ -177,8 +177,13 @@ export function TimeGrid({
             : { minWidth: AXIS_WIDTH + days.length * MIN_COLUMN }
         }
       >
-        {/* Day headers, pinned to the top of the scroller. */}
-        <div className="sticky top-0 z-30 flex border-b border-border bg-surface">
+        {/* Headers and all-day events pin together as one band. The all-day
+            row used to scroll with the grid, so opening on the morning hours
+            scrolled an all-day event straight out of sight — which for a
+            chore, whose whole existence on the calendar is that row, meant it
+            may as well not have been there. */}
+        <div className="sticky top-0 z-30 bg-surface">
+        <div className="flex border-b border-border bg-surface">
           <div
             className="sticky left-0 z-40 shrink-0 bg-surface"
             style={{ width: AXIS_WIDTH }}
@@ -244,6 +249,9 @@ export function TimeGrid({
                     type="button"
                     onClick={() => onOpenEvent(event)}
                     title={event.summary}
+                    // Timed blocks carry one too; without it a screen reader
+                    // reads an all-day chip as an unlabelled button.
+                    aria-label={`All day: ${event.summary}`}
                     className="block h-5 w-full truncate rounded px-1 text-left text-[11px] font-medium leading-5"
                     style={{
                       backgroundColor: event.color,
@@ -257,6 +265,7 @@ export function TimeGrid({
             ))}
           </div>
         )}
+        </div>
 
         <div className="relative flex" style={{ height: DAY_HEIGHT }}>
           <div
