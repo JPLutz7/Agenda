@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+import { textOn } from "@/lib/colors";
 import type { CalDay, CalEvent } from "./types";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -22,12 +24,31 @@ export function MonthGrid({
   selected,
   onSelect,
   onOpenEvent,
+  onCreate,
 }: {
   days: CalDay[];
   selected: number;
   onSelect: (index: number) => void;
   onOpenEvent: (event: CalEvent) => void;
+  /** Double-clicking a day. A month cell carries no time of day. */
+  onCreate: (day: string) => void;
 }) {
+  // Touch screens don't reliably fire dblclick, so taps are paired by hand.
+  const lastTap = useRef<{ at: number; day: string } | null>(null);
+  const onCellPointerUp = (
+    day: string,
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.pointerType === "mouse") return;
+    const previous = lastTap.current;
+    const now = Date.now();
+    lastTap.current = { at: now, day };
+    if (previous && previous.day === day && now - previous.at < 400) {
+      lastTap.current = null;
+      onCreate(day);
+    }
+  };
+
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
       <div className="grid grid-cols-7 border-b border-border">
@@ -50,6 +71,8 @@ export function MonthGrid({
           return (
             <div
               key={day.day}
+              onDoubleClick={() => onCreate(day.day)}
+              onPointerUp={(e) => onCellPointerUp(day.day, e)}
               className={`min-h-[92px] min-w-0 border-b border-l border-border p-0.5 first:border-l-0 ${
                 isSelected && !day.isToday ? "bg-surface-muted" : ""
               } ${day.inFocus ? "" : "opacity-40"}`}
@@ -86,8 +109,11 @@ export function MonthGrid({
                     onClick={() => onOpenEvent(event)}
                     title={`${event.timeLabel} · ${event.summary}`}
                     aria-label={`${event.timeLabel} ${event.summary}`}
-                    className="block w-full rounded-[2px] px-0.5 py-px text-left text-[8px] leading-[10px] text-white"
-                    style={{ backgroundColor: event.color }}
+                    className="block w-full rounded-[2px] px-0.5 py-px text-left text-[8px] leading-[10px]"
+                    style={{
+                      backgroundColor: event.color,
+                      color: textOn(event.color),
+                    }}
                   >
                     {/* A month cell is ~46px wide. The time is abbreviated to
                         '7p' and given its own line so the title gets the full

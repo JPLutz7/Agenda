@@ -19,6 +19,7 @@ import {
   getWriteCalendar,
   timezone,
 } from "./data";
+import { PERSON_PALETTE } from "./colors";
 import { addDays, today } from "./dates";
 import { normalizeFeedUrl } from "./ics";
 import {
@@ -38,16 +39,6 @@ import {
 import { canStoreSecrets, encryptSecret } from "./secrets";
 
 export type ActionState = { error?: string; ok?: string };
-
-/** Palette for roommate colors — distinguishable, and readable on both themes. */
-const PALETTE = [
-  "#2563eb",
-  "#db2777",
-  "#059669",
-  "#d97706",
-  "#7c3aed",
-  "#0891b2",
-];
 
 async function requireSession() {
   if (!(await isSignedIn())) redirect("/login");
@@ -86,8 +77,8 @@ export async function setupHousehold(
     "INSERT INTO people (name, color, sort_order) VALUES (?, ?, ?)",
   );
   db.transaction(() => {
-    insert.run(nameA, PALETTE[0], 0);
-    insert.run(nameB, PALETTE[1], 1);
+    insert.run(nameA, PERSON_PALETTE[0], 0);
+    insert.run(nameB, PERSON_PALETTE[1], 1);
     setPasscode(passcode);
   })();
 
@@ -125,7 +116,7 @@ export async function addPerson(
     .get()!.n;
   db.prepare(
     "INSERT INTO people (name, color, sort_order) VALUES (?, ?, ?)",
-  ).run(name, PALETTE[count % PALETTE.length], count);
+  ).run(name, PERSON_PALETTE[count % PERSON_PALETTE.length], count);
 
   refreshViews();
   return { ok: `Added ${name}.` };
@@ -351,6 +342,28 @@ export async function setWriteCalendar(
   setSetting("write_calendar_id", raw);
   refreshViews();
   return { ok: `New events will be added to "${calendar.display_name}".` };
+}
+
+/**
+ * Whose account this is — which is what colours everything it brings in.
+ *
+ * It's chosen when the account is connected, but that's a one-off decision
+ * made in a hurry, and getting it wrong meant a person's whole calendar
+ * showed in the apartment's colour with no way back short of reconnecting.
+ */
+export async function setAccountPerson(
+  accountId: number,
+  form: FormData,
+): Promise<void> {
+  await requireSession();
+  const raw = text(form, "person_id", 20);
+  const personId = raw === "" || raw === "household" ? null : Number(raw);
+  if (personId !== null && !Number.isInteger(personId)) return;
+  db.prepare("UPDATE caldav_accounts SET person_id = ? WHERE id = ?").run(
+    personId,
+    accountId,
+  );
+  refreshViews();
 }
 
 export async function disconnectICloudAccount(

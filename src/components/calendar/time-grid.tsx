@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { blockGeometry, placeEvents } from "@/lib/layout";
+import { textOn } from "@/lib/colors";
 import type { CalDay, CalEvent } from "./types";
 
 /**
@@ -24,6 +25,8 @@ const AXIS_WIDTH = 44;
 const MIN_COLUMN = 116;
 /** Below this a block can't fit two lines, so time and title share one. */
 const TWO_LINE_HEIGHT = 34;
+/** New events land on a quarter hour rather than 10:23. */
+const SLOT_MINUTES = 15;
 
 function hourLabel(hour: number): string {
   if (hour === 0) return "";
@@ -31,49 +34,50 @@ function hourLabel(hour: number): string {
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
+/** Where in the day a click landed, as 'HH:MM' on the nearest quarter hour. */
+function timeAt(offsetY: number, height: number): string {
+  const raw = (offsetY / height) * 1440;
+  const slot = Math.round(raw / SLOT_MINUTES) * SLOT_MINUTES;
+  const minutes = Math.max(0, Math.min(1440 - SLOT_MINUTES, slot));
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
+    minutes % 60,
+  ).padStart(2, "0")}`;
+}
+
 export function TimeGrid({
   days,
   selected,
   onSelect,
   onOpenEvent,
+  onCreate,
   nowMinutes,
 }: {
   days: CalDay[];
   selected: number;
   onSelect: (index: number) => void;
   onOpenEvent: (event: CalEvent) => void;
+  /** Double-clicking an empty spot: the day, and the time pointed at. */
+  onCreate: (day: string, time: string) => void;
   nowMinutes: number | null;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const single = days.length === 1;
 
   /**
-   * Trailing space so the final column can reach its snap position.
-   *
-   * Without it the furthest you can scroll is short of the last snap point,
-   * and the browser parks you between two — leaving a column half-hidden
-   * under the axis with its text cut off. Sizing the spacer to
-   * (viewport - axis - column) makes the maximum scroll land exactly on the
-   * last column's snap point.
+   * The week used to carry a blank spacer after the last day so every column
+   * could reach a start-aligned snap point. It worked, but it meant scrolling
+   * a screen's worth past Sunday into nothing. Snapping the final column to
+   * the *end* of the scrollport instead puts a snap point exactly at the
+   * furthest scroll, so the grid stops where the week does.
    */
-  const [tailSpace, setTailSpace] = useState(0);
-  useEffect(() => {
-    const node = scroller.current;
-    if (!node || single) {
-      setTailSpace(0);
-      return;
-    }
-    const update = () =>
-      setTailSpace(Math.max(0, node.clientWidth - AXIS_WIDTH - MIN_COLUMN));
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [single]);
+  const lastIndex = days.length - 1;
 
-  const tail = tailSpace ? (
-    <div className="shrink-0" style={{ width: tailSpace }} aria-hidden="true" />
-  ) : null;
+  /**
+   * Double-tap on a touch screen doesn't reliably produce a dblclick, so
+   * taps are paired here by time and distance. Mouse double-clicks are left
+   * to onDoubleClick, which already knows the platform's timing.
+   */
+  const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
 
   // Open on the working day, and on the selected day horizontally, rather
   // than at midnight on Sunday.
@@ -96,6 +100,39 @@ export function TimeGrid({
   const allDayByDay = days.map((d) => d.events.filter((e) => e.allDay));
   const hasAllDay = allDayByDay.some((list) => list.length > 0);
   const columnStyle = { flex: `1 0 ${single ? 0 : MIN_COLUMN}px` };
+  const snapClass = (index: number) =>
+    index === lastIndex ? "snap-end" : "snap-start";
+
+  /** A double-click on empty grid, turned into a day and a time. */
+  const createAt = (
+    day: string,
+    target: HTMLElement,
+    clientY: number,
+  ) => {
+    const box = target.getBoundingClientRect();
+    onCreate(day, timeAt(clientY - box.top, box.height));
+  };
+
+  const onColumnPointerUp = (
+    day: string,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    // Only the column's own background — a tap on an event opens that event.
+    if (event.pointerType === "mouse" || event.target !== event.currentTarget) {
+      return;
+    }
+    const previous = lastTap.current;
+    const now = Date.now();
+    lastTap.current = { at: now, x: event.clientX, y: event.clientY };
+    if (
+      previous &&
+      now - previous.at < 400 &&
+      Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 30
+    ) {
+      lastTap.current = null;
+      createAt(day, event.currentTarget, event.clientY);
+    }
+  };
 
   return (
     <div
@@ -127,7 +164,9 @@ export function TimeGrid({
                 aria-label={`${day.weekdayShort} ${day.dayOfMonth}${
                   day.isToday ? ", today" : ""
                 }`}
-                className="flex min-w-0 snap-start flex-col items-center gap-0.5 border-l border-border py-1.5"
+                className={`flex min-w-0 flex-col items-center gap-0.5 border-l border-border py-1.5 ${snapClass(
+                  index,
+                )}`}
                 style={columnStyle}
               >
                 <span
@@ -152,7 +191,6 @@ export function TimeGrid({
               </button>
             );
           })}
-          {tail}
         </div>
 
         {hasAllDay && (
@@ -175,15 +213,17 @@ export function TimeGrid({
                     type="button"
                     onClick={() => onOpenEvent(event)}
                     title={event.summary}
-                    className="block h-5 w-full truncate rounded px-1 text-left text-[11px] font-medium leading-5 text-white"
-                    style={{ backgroundColor: event.color }}
+                    className="block h-5 w-full truncate rounded px-1 text-left text-[11px] font-medium leading-5"
+                    style={{
+                      backgroundColor: event.color,
+                      color: textOn(event.color),
+                    }}
                   >
                     {event.summary}
                   </button>
                 ))}
               </div>
             ))}
-            {tail}
           </div>
         )}
 
@@ -220,9 +260,14 @@ export function TimeGrid({
               return (
                 <div
                   key={day.day}
-                  className={`relative min-w-0 snap-start border-l border-border ${
-                    !single && index === selected ? "bg-surface-muted/50" : ""
-                  }`}
+                  onDoubleClick={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    createAt(day.day, e.currentTarget, e.clientY);
+                  }}
+                  onPointerUp={(e) => onColumnPointerUp(day.day, e)}
+                  className={`relative min-w-0 border-l border-border ${snapClass(
+                    index,
+                  )} ${!single && index === selected ? "bg-surface-muted/50" : ""}`}
                   style={columnStyle}
                 >
                   {placed.map((event) => {
@@ -235,14 +280,15 @@ export function TimeGrid({
                         onClick={() => onOpenEvent(event)}
                         title={`${event.timeLabel} · ${event.summary}`}
                         aria-label={`${event.timeLabel} ${event.summary}`}
-                        className="absolute overflow-hidden rounded px-1 py-px text-left leading-tight text-white ring-1 ring-inset ring-white/25"
+                        className="absolute overflow-hidden rounded px-1 py-px text-left leading-tight ring-1 ring-inset ring-white/25"
                         style={{
                           top: `${top * 100}%`,
                           height: `${height * 100}%`,
                           left: `${event.left * 100}%`,
                           width: `calc(${event.width * 100}% - 2px)`,
                           backgroundColor: event.color,
-                          zIndex: 1 + event.depth,
+                          color: textOn(event.color),
+                          zIndex: 1 + event.column,
                         }}
                       >
                         {twoLines ? (
@@ -279,7 +325,6 @@ export function TimeGrid({
                 </div>
               );
             })}
-            {tail}
           </div>
         </div>
       </div>

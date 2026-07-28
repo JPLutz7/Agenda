@@ -1,5 +1,13 @@
 import { requireSignedIn } from "@/lib/guard";
-import { getEvents, getPeople, groupByDay, timezone } from "@/lib/data";
+import {
+  getEvents,
+  getPeople,
+  getWritableCalendars,
+  getWriteCalendar,
+  groupByDay,
+  timezone,
+} from "@/lib/data";
+import { HOUSEHOLD_COLOR } from "@/lib/colors";
 import { refreshIfStale } from "@/lib/sync";
 import {
   addDays,
@@ -185,6 +193,17 @@ export default async function CalendarPage({
   const href = (date: string) => `/calendar?view=${scale}&date=${date}`;
   const people = getPeople();
 
+  // The add-event form appears twice here — under the grid, and as the dialog
+  // a double-click opens — and needs the same choices in both.
+  const addOptions = {
+    people,
+    calendars: getWritableCalendars(),
+    defaultCalendarId: getWriteCalendar()?.id ?? null,
+  };
+  const dayLabels = Object.fromEntries(
+    days.map((d) => [d.day, formatFullDate(d.day)]),
+  );
+
   return (
     <>
       <PageHeader title="Calendar" />
@@ -205,6 +224,8 @@ export default async function CalendarPage({
             : null
         }
         isCurrentPeriod={isCurrentPeriod}
+        addOptions={addOptions}
+        dayLabels={dayLabels}
       />
 
       {people.length > 0 && scale !== "year" && (
@@ -219,7 +240,10 @@ export default async function CalendarPage({
             </li>
           ))}
           <li className="flex items-center gap-1.5">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-[#6b7280]" />
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: HOUSEHOLD_COLOR }}
+            />
             Apartment
           </li>
         </ul>

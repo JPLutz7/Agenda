@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addHouseholdEvent } from "@/lib/actions";
 import type { Person, WritableCalendarOption } from "@/lib/data";
 import {
@@ -23,37 +23,53 @@ function shiftTime(time: string, minutes: number): string {
   ).padStart(2, "0")}`;
 }
 
+export type AddEventOptions = {
+  people: Person[];
+  calendars: WritableCalendarOption[];
+  defaultCalendarId: number | null;
+};
+
 /**
- * Adding something to the apartment calendar.
+ * The fields themselves, shared by the button on the page and the dialog the
+ * calendar opens on a double-click.
  *
  * The end time follows the start rather than having to be typed: picking 7:00
  * fills in 7:30, and moving the start moves the end with it, keeping whatever
  * length was set. All-day is its own toggle instead of the old "leave the
  * times blank", which nobody would guess.
  *
- * The destination calendar is chosen here, per event. Setup's choice arrives
- * as `defaultCalendarId` and is only the pre-selection — with no iCloud
- * account connected there is nowhere to send it, so the picker stays hidden
- * and the event simply lives in the app.
+ * The destination calendar is chosen per event. Setup's choice arrives as
+ * `defaultCalendarId` and is only the pre-selection — with no iCloud account
+ * connected there is nowhere to send it, so the picker stays hidden and the
+ * event simply lives in the app.
  */
-export function AddHouseholdEventForm({
+function EventFields({
   people,
-  defaultDate,
   calendars,
   defaultCalendarId,
-}: {
-  people: Person[];
+  defaultDate,
+  defaultStartTime = "",
+  autoFocus = false,
+  submitLabel = "Add to calendar",
+  onDone,
+}: AddEventOptions & {
   defaultDate: string;
-  calendars: WritableCalendarOption[];
-  defaultCalendarId: number | null;
+  /** 'HH:MM' when the time is already known, e.g. where the grid was tapped. */
+  defaultStartTime?: string;
+  autoFocus?: boolean;
+  submitLabel?: string;
+  onDone?: () => void;
 }) {
   const [allDay, setAllDay] = useState(false);
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
+  const [start, setStart] = useState(defaultStartTime);
+  const [end, setEnd] = useState(
+    defaultStartTime ? shiftTime(defaultStartTime, DEFAULT_MINUTES) : "",
+  );
+  const titleRef = useRef<HTMLInputElement>(null);
 
-  // One person's calendars need no headings; two accounts do, since both are
-  // likely to have a "Home".
-  const accountLabels = [...new Set(calendars.map((c) => c.account_label))];
+  useEffect(() => {
+    if (autoFocus) titleRef.current?.focus();
+  }, [autoFocus]);
 
   const onStartChange = (value: string) => {
     if (!value) {
@@ -73,120 +89,209 @@ export function AddHouseholdEventForm({
     setEnd(shiftTime(value, previous || DEFAULT_MINUTES));
   };
 
+  // One person's calendars need no headings; two accounts do, since both are
+  // likely to have a "Home".
+  const accountLabels = [...new Set(calendars.map((c) => c.account_label))];
+
+  return (
+    <ActionForm
+      action={addHouseholdEvent}
+      className="space-y-3"
+      resetOnSuccess
+      onSuccess={() => {
+        setAllDay(false);
+        setStart("");
+        setEnd("");
+        onDone?.();
+      }}
+    >
+      <Field label="What">
+        <input
+          ref={titleRef}
+          name="title"
+          required
+          className={fieldClass}
+          placeholder="Landlord inspection"
+        />
+      </Field>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <Field label="Date">
+            <input
+              name="date"
+              type="date"
+              required
+              defaultValue={defaultDate}
+              className={fieldClass}
+            />
+          </Field>
+        </div>
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={() => setAllDay((v) => !v)}
+            aria-pressed={allDay}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              allDay
+                ? "border-accent bg-accent text-white"
+                : "border-border bg-surface-muted text-foreground"
+            }`}
+          >
+            All day
+          </button>
+        </div>
+      </div>
+
+      {/* The server decides from this, not from whether times are blank. */}
+      <input type="hidden" name="all_day" value={allDay ? "1" : "0"} />
+
+      {!allDay && (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Start">
+            <input
+              name="start_time"
+              type="time"
+              required
+              value={start}
+              onChange={(e) => onStartChange(e.target.value)}
+              className={fieldClass}
+            />
+          </Field>
+          <Field label="End">
+            <input
+              name="end_time"
+              type="time"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              className={fieldClass}
+            />
+          </Field>
+        </div>
+      )}
+
+      <Field label="Notes">
+        <input name="notes" className={fieldClass} placeholder="Optional" />
+      </Field>
+
+      {calendars.length > 0 && (
+        <Field label="Add it to">
+          <select
+            name="calendar_id"
+            defaultValue={defaultCalendarId ?? "none"}
+            className={fieldClass}
+          >
+            <option value="none">This app only</option>
+            {accountLabels.length > 1
+              ? accountLabels.map((label) => (
+                  <optgroup key={label} label={label}>
+                    {calendars
+                      .filter((c) => c.account_label === label)
+                      .map((calendar) => (
+                        <option key={calendar.id} value={calendar.id}>
+                          {calendar.display_name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))
+              : calendars.map((calendar) => (
+                  <option key={calendar.id} value={calendar.id}>
+                    {calendar.display_name}
+                  </option>
+                ))}
+          </select>
+        </Field>
+      )}
+
+      {people.length > 0 && (
+        <input type="hidden" name="created_by" value={people[0].id} />
+      )}
+      <SubmitButton>{submitLabel}</SubmitButton>
+    </ActionForm>
+  );
+}
+
+/** Adding something to the apartment calendar, from a page. */
+export function AddHouseholdEventForm({
+  defaultDate,
+  ...options
+}: AddEventOptions & { defaultDate: string }) {
   return (
     <Disclosure summary="Add something to the apartment calendar">
-      <ActionForm
-        action={addHouseholdEvent}
-        className="space-y-3"
-        resetOnSuccess
-        onSuccess={() => {
-          setAllDay(false);
-          setStart("");
-          setEnd("");
-        }}
-      >
-        <Field label="What">
-          <input
-            name="title"
-            required
-            className={fieldClass}
-            placeholder="Landlord inspection"
-          />
-        </Field>
+      <EventFields {...options} defaultDate={defaultDate} />
+    </Disclosure>
+  );
+}
 
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <Field label="Date">
-              <input
-                name="date"
-                type="date"
-                required
-                defaultValue={defaultDate}
-                className={fieldClass}
-              />
-            </Field>
-          </div>
-          <div className="flex items-end">
+/**
+ * The same form as a dialog, for double-clicking a spot on the calendar.
+ *
+ * The day and the time double-clicked arrive already filled in, which is the
+ * whole point — the alternative is retyping what you just pointed at. Keyed on
+ * both in the calendar so a second double-click somewhere else starts fresh
+ * rather than keeping the first spot's time.
+ */
+export function AddEventDialog({
+  open,
+  date,
+  time,
+  dateLabel,
+  onClose,
+  ...options
+}: AddEventOptions & {
+  open: boolean;
+  date: string;
+  /** 'HH:MM', or null when the day was picked without a time. */
+  time: string | null;
+  dateLabel: string;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) onClose();
+      }}
+      // m-auto centres it: the Tailwind reset zeroes the margin a <dialog>
+      // would otherwise use to centre itself, pinning it to the top.
+      className="m-auto w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/40"
+    >
+      {open && (
+        <div className="p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold leading-snug">New event</h2>
+              <p className="mt-0.5 text-xs text-muted">{dateLabel}</p>
+            </div>
             <button
               type="button"
-              onClick={() => setAllDay((v) => !v)}
-              aria-pressed={allDay}
-              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                allDay
-                  ? "border-accent bg-accent text-white"
-                  : "border-border bg-surface-muted text-foreground"
-              }`}
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded-lg border border-border bg-surface-muted px-2 py-1 text-sm"
             >
-              All day
+              ✕
             </button>
           </div>
+          <EventFields
+            {...options}
+            defaultDate={date}
+            defaultStartTime={time ?? ""}
+            autoFocus
+            submitLabel="Add event"
+            onDone={onClose}
+          />
         </div>
-
-        {/* The server decides from this, not from whether times are blank. */}
-        <input type="hidden" name="all_day" value={allDay ? "1" : "0"} />
-
-        {!allDay && (
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Start">
-              <input
-                name="start_time"
-                type="time"
-                required
-                value={start}
-                onChange={(e) => onStartChange(e.target.value)}
-                className={fieldClass}
-              />
-            </Field>
-            <Field label="End">
-              <input
-                name="end_time"
-                type="time"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className={fieldClass}
-              />
-            </Field>
-          </div>
-        )}
-
-        <Field label="Notes">
-          <input name="notes" className={fieldClass} placeholder="Optional" />
-        </Field>
-
-        {calendars.length > 0 && (
-          <Field label="Add it to">
-            <select
-              name="calendar_id"
-              defaultValue={defaultCalendarId ?? "none"}
-              className={fieldClass}
-            >
-              <option value="none">This app only</option>
-              {accountLabels.length > 1
-                ? accountLabels.map((label) => (
-                    <optgroup key={label} label={label}>
-                      {calendars
-                        .filter((c) => c.account_label === label)
-                        .map((calendar) => (
-                          <option key={calendar.id} value={calendar.id}>
-                            {calendar.display_name}
-                          </option>
-                        ))}
-                    </optgroup>
-                  ))
-                : calendars.map((calendar) => (
-                    <option key={calendar.id} value={calendar.id}>
-                      {calendar.display_name}
-                    </option>
-                  ))}
-            </select>
-          </Field>
-        )}
-
-        {people.length > 0 && (
-          <input type="hidden" name="created_by" value={people[0].id} />
-        )}
-        <SubmitButton>Add to calendar</SubmitButton>
-      </ActionForm>
-    </Disclosure>
+      )}
+    </dialog>
   );
 }

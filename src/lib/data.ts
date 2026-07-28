@@ -1,5 +1,6 @@
 import "server-only";
 import { db, getSetting } from "./db";
+import { HOUSEHOLD_COLOR } from "./colors";
 import {
   DEFAULT_TIMEZONE,
   addDays,
@@ -63,8 +64,6 @@ export type ListItem = {
   added_by_name: string | null;
   added_by_color: string | null;
 };
-
-const HOUSEHOLD_COLOR = "#6b7280";
 
 export function timezone(): string {
   return getSetting("timezone") ?? DEFAULT_TIMEZONE;
@@ -301,6 +300,7 @@ export type CalDavAccountView = {
   id: number;
   label: string;
   username: string;
+  person_id: number | null;
   person_name: string | null;
   person_color: string | null;
   last_error: string | null;
@@ -315,12 +315,13 @@ export function getCalDavAccounts(): CalDavAccountView[] {
         id: number;
         label: string;
         username: string;
+        person_id: number | null;
         person_name: string | null;
         person_color: string | null;
         last_error: string | null;
       }
     >(
-      `SELECT a.id, a.label, a.username, a.last_error,
+      `SELECT a.id, a.label, a.username, a.person_id, a.last_error,
               p.name AS person_name, p.color AS person_color
        FROM caldav_accounts a
        LEFT JOIN people p ON p.id = a.person_id

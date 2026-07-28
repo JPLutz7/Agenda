@@ -1,10 +1,12 @@
 import {
   connectICloudAccount,
   disconnectICloudAccount,
+  setAccountPerson,
   setCalendarEnabled,
   setWriteCalendar,
 } from "@/lib/actions";
 import type { CalDavAccountView, Person } from "@/lib/data";
+import { HOUSEHOLD_COLOR } from "@/lib/colors";
 import {
   ActionForm,
   Disclosure,
@@ -80,14 +82,36 @@ export function ICloudSetup({
                 <span
                   aria-hidden="true"
                   className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: account.person_color ?? "#6b7280" }}
+                  style={{ backgroundColor: account.person_color ?? HOUSEHOLD_COLOR }}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{account.label}</p>
                   <p className="mt-0.5 truncate text-xs text-muted">
                     {account.username}
-                    {account.person_name ? ` · ${account.person_name}` : ""}
                   </p>
+                  {/* Whose it is decides the colour everything from this
+                      account is drawn in, so it has to be changeable. */}
+                  <form
+                    action={setAccountPerson.bind(null, account.id)}
+                    className="mt-1.5 flex items-center gap-1.5"
+                  >
+                    <select
+                      name="person_id"
+                      defaultValue={account.person_id ?? "household"}
+                      aria-label={`Whose account ${account.label} is`}
+                      className="rounded-md border border-border bg-surface px-1.5 py-1 text-xs"
+                    >
+                      {people.map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.name}
+                        </option>
+                      ))}
+                      <option value="household">The apartment</option>
+                    </select>
+                    <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
+                      Save
+                    </SubmitButton>
+                  </form>
                   {account.last_error && (
                     <p className="mt-1 text-xs text-red-500">
                       {account.last_error}

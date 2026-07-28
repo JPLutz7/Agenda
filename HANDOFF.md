@@ -91,6 +91,27 @@ falls back to the Setup default. With no CalDAV account the select isn't
 rendered and events stay local. Deletion needed no change — each row already
 records the calendar it went to.
 
+**Adding from the calendar.** Double-clicking (or double-tapping) empty grid
+opens the same add form in a dialog, with the day and the time pointed at
+already filled in — quarter-hour rounded, see `timeAt` in `time-grid.tsx`.
+Touch screens don't fire a reliable `dblclick`, so taps are paired by hand
+from `pointerup`; mouse double-clicks use `onDoubleClick`. The same form also
+sits under the grid as a disclosure, as on the Today page.
+
+**Colours.** `src/lib/colors.ts` is the one place they live: the apartment is
+gold, and each person keeps their own. Nino red and João blue were applied
+once by `applyRequestedColors` in `db.ts`, which leaves a `settings` marker so
+anything changed in Setup afterwards sticks. `textOn()` picks black or white
+ink per background — white on gold is unreadable. What colour an iCloud
+account's events take comes from the person it's assigned to, changeable per
+account in Setup (`setAccountPerson`); unassigned accounts read as the
+apartment.
+
+**The week grid.** Overlapping events divide their day evenly — two abreast
+take half each, three a third (`placeEvents`). The week used to carry a blank
+spacer after Sunday so every column could snap; the last column now snaps to
+the scrollport's end instead, so the grid stops where the week does.
+
 ## Next task
 
 **Forms lose what was typed when an action returns an error.**

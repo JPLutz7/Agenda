@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  AddEventDialog,
+  AddHouseholdEventForm,
+  type AddEventOptions,
+} from "@/components/add-event-form";
 import { EventModal } from "./event-modal";
 import { MonthGrid } from "./month-grid";
 import { TimeGrid } from "./time-grid";
@@ -36,6 +41,8 @@ export function CalendarView({
   todayHref,
   nowMinutes,
   isCurrentPeriod,
+  addOptions,
+  dayLabels,
 }: {
   scale: CalendarScale;
   anchor: string;
@@ -48,9 +55,17 @@ export function CalendarView({
   todayHref: string;
   nowMinutes: number | null;
   isCurrentPeriod: boolean;
+  /** Everything the add-event form needs, resolved on the server. */
+  addOptions: AddEventOptions;
+  /** 'Tuesday, July 28, 2026' for each day on screen, keyed by day. */
+  dayLabels: Record<string, string>;
 }) {
   const router = useRouter();
   const [openEvent, setOpenEvent] = useState<CalEvent | null>(null);
+  /** The spot double-clicked on the grid, waiting to become an event. */
+  const [draft, setDraft] = useState<{ date: string; time: string | null } | null>(
+    null,
+  );
 
   // Land on today when it's on screen; otherwise the first day of the period,
   // so the panel underneath always has something to show.
@@ -137,6 +152,7 @@ export function CalendarView({
           selected={selected}
           onSelect={setSelected}
           onOpenEvent={setOpenEvent}
+          onCreate={(day) => setDraft({ date: day, time: null })}
         />
       ) : (
         <TimeGrid
@@ -144,8 +160,15 @@ export function CalendarView({
           selected={selected}
           onSelect={setSelected}
           onOpenEvent={setOpenEvent}
+          onCreate={(day, time) => setDraft({ date: day, time })}
           nowMinutes={nowMinutes}
         />
+      )}
+
+      {scale !== "year" && (
+        <p className="mt-2 px-1 text-xs text-muted">
+          Double-tap (or double-click) an empty spot to add something there.
+        </p>
       )}
 
       {scale !== "year" && (
@@ -158,7 +181,25 @@ export function CalendarView({
         </div>
       )}
 
+      {scale !== "year" && (
+        <div className="mt-5">
+          <AddHouseholdEventForm {...addOptions} defaultDate={anchor} />
+        </div>
+      )}
+
       <EventModal event={openEvent} onClose={() => setOpenEvent(null)} />
+
+      <AddEventDialog
+        {...addOptions}
+        // A fresh form per spot: the previous one's time would otherwise
+        // linger in the fields.
+        key={draft ? `${draft.date}T${draft.time ?? ""}` : "none"}
+        open={draft !== null}
+        date={draft?.date ?? anchor}
+        time={draft?.time ?? null}
+        dateLabel={draft ? (dayLabels[draft.date] ?? draft.date) : ""}
+        onClose={() => setDraft(null)}
+      />
     </div>
   );
 }

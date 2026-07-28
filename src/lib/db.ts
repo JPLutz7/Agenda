@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { REQUESTED_COLORS, normalizeName } from "./colors";
 
 /**
  * SQLite lives on disk so the two of us see the same data. In dev that's
@@ -217,6 +218,38 @@ function migrate(db: Database.Database) {
     }
   }
 
+  applyRequestedColors(db);
+}
+
+/**
+ * The household asked for particular colours — red for Nino, blue for João —
+ * rather than the ones the palette handed out when they signed up. Names are
+ * the only stable way to tell who is who; ids just record who was typed in
+ * first.
+ *
+ * Runs once and leaves a marker, so colours changed in Setup afterwards are
+ * never overwritten. A name that matches nothing is left alone.
+ */
+function applyRequestedColors(db: Database.Database) {
+  const marker = "requested_colors_applied";
+  const done = db
+    .prepare<[string], { value: string }>(
+      "SELECT value FROM settings WHERE key = ?",
+    )
+    .get(marker);
+  if (done) return;
+
+  const people = db
+    .prepare<[], { id: number; name: string }>("SELECT id, name FROM people")
+    .all();
+  const update = db.prepare("UPDATE people SET color = ? WHERE id = ?");
+  for (const person of people) {
+    const name = normalizeName(person.name);
+    const wanted = REQUESTED_COLORS.find((c) => name.includes(c.match));
+    if (wanted) update.run(wanted.color, person.id);
+  }
+
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, '1')").run(marker);
 }
 
 function connection(): Database.Database {
