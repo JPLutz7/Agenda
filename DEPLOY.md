@@ -29,6 +29,27 @@ the app, and a background calendar sync that actually runs. That sync
 is looking, so the data is already current when you open the app rather than
 being fetched while you wait.
 
+### Deploying from a browser, with no computer setup
+
+If you don't want to install anything — a borrowed machine, a work laptop, or
+you're on a phone — skip the steps below entirely. `.github/workflows/deploy.yml`
+runs the deploy on GitHub's servers instead.
+
+One-time setup, all in a browser:
+
+1. **Fly** → your app → **Tokens** → create a deploy token → copy it.
+2. **GitHub** → the repo → **Settings** → **Secrets and variables** →
+   **Actions** → **New repository secret**. Name it exactly `FLY_API_TOKEN`,
+   paste the token, save.
+
+Then, any time you want to deploy: **Actions** tab → **Deploy to Fly** → **Run
+workflow**. It also runs by itself whenever the branch changes.
+
+A green tick means it's live. A red cross means it failed, and clicking into
+the run shows why.
+
+The rest of this section is the laptop route, if you'd rather have it local.
+
 ### 1. Install and sign in
 
 ```bash

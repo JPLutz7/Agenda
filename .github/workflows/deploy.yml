@@ -1,0 +1,43 @@
+name: Deploy to Fly
+
+# Deploying without a computer.
+#
+# `fly deploy` normally runs from a laptop, which means installing the Fly
+# tool and leaving an account login on that machine. Running it here instead
+# means the deploy happens on GitHub's servers: nothing to install, and no
+# credential left behind on a borrowed or work computer.
+#
+# Two ways it runs:
+#   - the "Run workflow" button on the Actions tab, any time you want
+#   - automatically, whenever the branch changes
+#
+# Needs one repository secret, FLY_API_TOKEN. See DEPLOY.md.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/shared-roommate-calendar-0x23o9
+
+# One deploy at a time. Two overlapping ones would fight over the single
+# machine that holds the database.
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        # --remote-only builds the image on Fly's builders rather than here.
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
