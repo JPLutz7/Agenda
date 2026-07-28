@@ -689,6 +689,44 @@ export async function removeChore(choreId: number): Promise<void> {
 
 /* -------------------------------------------------------------------- list */
 
+/**
+ * The key a remembered price is filed under: lowercased, punctuation-light,
+ * whitespace collapsed. "Oat Milk " and "oat milk" are the same purchase.
+ */
+function priceKey(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function rememberPrice(text: string, cents: number): void {
+  const key = priceKey(text);
+  if (!key) return;
+  db.prepare(
+    `INSERT INTO price_memory (name, label, price_cents, recorded_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(name) DO UPDATE SET
+       label = excluded.label,
+       price_cents = excluded.price_cents,
+       recorded_at = excluded.recorded_at`,
+  ).run(key, text, cents);
+}
+
+function recallPrice(text: string): number | null {
+  const key = priceKey(text);
+  if (!key) return null;
+  const row = db
+    .prepare<[string], { price_cents: number }>(
+      "SELECT price_cents FROM price_memory WHERE name = ?",
+    )
+    .get(key);
+  return row?.price_cents ?? null;
+}
+
 /** Dollars as typed ("4.29", "$4.29") to whole cents. */
 function priceToCents(raw: string): number | null {
   const cleaned = raw.replace(/[^0-9.]/g, "");
@@ -709,9 +747,12 @@ export async function addListItem(
   if (!itemText) return { error: "" };
 
   if (category === "need") {
+    // Seed from what this cost last time, so the memory survives the list
+    // being cleared — which is the normal way a shopping list is used.
     db.prepare(
-      "INSERT INTO list_items (text, added_by, category) VALUES (?, ?, 'need')",
-    ).run(itemText, addedBy);
+      `INSERT INTO list_items (text, added_by, category, last_price_cents)
+       VALUES (?, ?, 'need', ?)`,
+    ).run(itemText, addedBy, recallPrice(itemText));
     refreshViews();
     return { ok: "" };
   }
@@ -746,6 +787,13 @@ export async function setItemPrice(
   if (!itemId) return { error: "" };
   if (cents === null) return { error: "That doesn't look like a price." };
 
+  const item = db
+    .prepare<[number], { text: string }>(
+      "SELECT text FROM list_items WHERE id = ?",
+    )
+    .get(itemId);
+  if (!item) return { error: "" };
+
   db.transaction(() => {
     db.prepare(
       `UPDATE list_items
@@ -755,6 +803,7 @@ export async function setItemPrice(
     db.prepare(
       "INSERT INTO price_history (item_id, price_cents, source) VALUES (?, ?, 'manual')",
     ).run(itemId, cents);
+    rememberPrice(item.text, cents);
   })();
 
   refreshViews();
@@ -782,6 +831,19 @@ export async function toggleListItem(itemId: number): Promise<void> {
      SET checked_at = CASE WHEN checked_at IS NULL THEN datetime('now') ELSE NULL END
      WHERE id = ?`,
   ).run(itemId);
+  refreshViews();
+}
+
+/**
+ * Remove one item for good.
+ *
+ * Deliberately leaves `price_memory` alone: forgetting the item is not the
+ * same as forgetting what it costs, and adding it back next week should still
+ * say "last time $4.29". Setup can clear the memory outright if that's wanted.
+ */
+export async function deleteListItem(itemId: number): Promise<void> {
+  await requireSession();
+  db.prepare("DELETE FROM list_items WHERE id = ?").run(itemId);
   refreshViews();
 }
 

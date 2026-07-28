@@ -219,6 +219,19 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS price_history_item_idx
       ON price_history(item_id, recorded_at DESC);
 
+    -- What a thing costs, remembered by name rather than by row.
+    --
+    -- A shopping list is meant to be emptied: you buy the paper towels, tick
+    -- them off, clear the cart. If the price lived only on the row it would
+    -- die with it, and "last time $4.29" would never once appear — the memory
+    -- has to outlive the item to be worth having.
+    CREATE TABLE IF NOT EXISTS price_memory (
+      name        TEXT PRIMARY KEY,   -- normalised: lowercased, spaces collapsed
+      label       TEXT NOT NULL,      -- as last typed, for display
+      price_cents INTEGER NOT NULL,
+      recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL

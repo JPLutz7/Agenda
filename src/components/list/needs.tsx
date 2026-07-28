@@ -1,4 +1,8 @@
-import { setItemPrice, toggleListItem } from "@/lib/actions";
+import {
+  deleteListItem,
+  setItemPrice,
+  toggleListItem,
+} from "@/lib/actions";
 import type { ListItem } from "@/lib/data";
 import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
 import { Empty } from "@/components/ui";
@@ -123,6 +127,18 @@ export function Needs({
                       </SubmitButton>
                     </div>
                   </ActionForm>
+
+                  {/* Gone for good. The remembered price isn't — see
+                      deleteListItem — so re-adding it still knows the cost. */}
+                  <form action={deleteListItem.bind(null, item.id)}>
+                    <SubmitButton
+                      variant="danger"
+                      title={`Delete ${item.text} permanently`}
+                      className="px-2 py-1"
+                    >
+                      ✕
+                    </SubmitButton>
+                  </form>
                 </div>
               </li>
             ))}

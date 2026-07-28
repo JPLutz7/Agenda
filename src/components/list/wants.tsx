@@ -1,6 +1,7 @@
 import {
   checkAllWantPrices,
   checkWantPrice,
+  deleteListItem,
   toggleListItem,
 } from "@/lib/actions";
 import type { ListItem } from "@/lib/data";
@@ -156,8 +157,11 @@ export function Wants({
           </h3>
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
             {done.map((item) => (
-              <li key={item.id} className="px-2 py-1">
-                <form action={toggleListItem.bind(null, item.id)}>
+              <li key={item.id} className="flex items-center gap-2 px-2 py-1">
+                <form
+                  action={toggleListItem.bind(null, item.id)}
+                  className="min-w-0 flex-1"
+                >
                   <button
                     type="submit"
                     className="flex w-full items-center gap-3 px-2 py-2 text-left"
@@ -174,6 +178,15 @@ export function Wants({
                       </span>
                     )}
                   </button>
+                </form>
+                <form action={deleteListItem.bind(null, item.id)}>
+                  <SubmitButton
+                    variant="danger"
+                    title={`Delete ${item.text} permanently`}
+                    className="px-2 py-1"
+                  >
+                    ✕
+                  </SubmitButton>
                 </form>
               </li>
             ))}

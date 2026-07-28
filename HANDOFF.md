@@ -151,6 +151,16 @@ item off, and it shows "last time $4.29" next time, with a trip estimate and a
 monthly total. No API — nothing covers Aldi or Martin's, and a price from a
 shop you're not standing in is worse than none.
 
+The remembered price lives in `price_memory`, keyed by a normalised item name,
+**not** on the item row. It has to: a shopping list is meant to be emptied, and
+when the price lived on the row it died with it, so "last time $4.29" could
+never appear in normal use. Keyed by name means it also survives deleting the
+item and comes back when it's re-added, case and punctuation ignored.
+
+Items can be deleted permanently one at a time (`deleteListItem`) as well as in
+bulk per category. Deleting removes the item, never the price memory —
+forgetting the item isn't the same as forgetting what it costs.
+
 *Wants* (method 2) are looked up from Best Buy's Products API
 (`src/lib/bestbuy.ts`, `src/lib/prices.ts`). A Want is stored as a *search*
 until the first check binds it to a SKU; after that it refreshes by SKU so the
