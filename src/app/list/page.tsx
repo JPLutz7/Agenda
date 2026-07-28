@@ -51,9 +51,12 @@ export default async function ListPage() {
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
           {open.map((item) => (
             <li key={item.id} className="flex items-center gap-3 px-2 py-1">
+              {/* min-w-0: a flex child won't shrink below its content by
+                  default, so a long item name pushes the row wider than the
+                  card instead of truncating inside it. */}
               <form
                 action={toggleListItem.bind(null, item.id)}
-                className="flex-1"
+                className="min-w-0 flex-1"
               >
                 <button
                   type="submit"

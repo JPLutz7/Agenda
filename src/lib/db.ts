@@ -21,7 +21,23 @@ function open(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  migrate(db);
+  // If another process is mid-migration, wait for it rather than failing
+  // instantly with SQLITE_BUSY.
+  db.pragma("busy_timeout = 10000");
+
+  // Serialise migration across processes. BEGIN IMMEDIATE takes the write
+  // lock up front, so a second process starting at the same moment blocks
+  // here and then sees the finished schema instead of racing halfway through
+  // it — which is exactly what happens when Next.js runs several build
+  // workers at once.
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    migrate(db);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
   return db;
 }
 
@@ -203,8 +219,30 @@ function migrate(db: Database.Database) {
 
 }
 
-export const db: Database.Database =
-  globalThis.__agendaDb ?? (globalThis.__agendaDb = open());
+function connection(): Database.Database {
+  return (globalThis.__agendaDb ??= open());
+}
+
+/**
+ * Opened on first query, not on import.
+ *
+ * Importing this module used to open and migrate the database immediately,
+ * which meant `next build` did it too: collecting page data loads every route
+ * module, in several worker processes at once, so a build would create a
+ * database purely as a side effect and occasionally fail when two workers
+ * migrated the same file simultaneously. Nothing about building the app should
+ * touch the household's data.
+ */
+export const db: Database.Database = new Proxy({} as Database.Database, {
+  get(_target, property, receiver) {
+    const real = connection();
+    const value = Reflect.get(real, property, receiver);
+    return typeof value === "function" ? value.bind(real) : value;
+  },
+  set(_target, property, value) {
+    return Reflect.set(connection(), property, value);
+  },
+});
 
 export function getSetting(key: string): string | null {
   const row = db
