@@ -83,11 +83,18 @@ function describeAuthFailure(err: unknown): string {
 
 function toDiscovered(calendar: DAVCalendar): DiscoveredCalendar {
   const components = (calendar.components ?? []) as string[];
-  // tsdav doesn't type the privilege set, but servers that report it let us
-  // tell an editable calendar from a subscription we can only read.
-  const privileges = JSON.stringify(
-    (calendar as unknown as { privilegeSet?: unknown[] }).privilegeSet ?? [],
-  );
+  // tsdav doesn't surface the DAV privilege set, so there's no reliable way
+  // to tell an editable calendar from a subscription up front. Rather than
+  // guess and risk hiding the calendar someone actually wants to write to,
+  // offer them all: a write to a read-only calendar fails with the server's
+  // own reason, which is surfaced in the UI.
+  const privileges = (calendar as unknown as { privilegeSet?: unknown[] })
+    .privilegeSet;
+  const reportedReadOnly =
+    Array.isArray(privileges) &&
+    privileges.length > 0 &&
+    !/"write(-content)?"/.test(JSON.stringify(privileges));
+
   return {
     url: calendar.url,
     displayName:
@@ -95,11 +102,15 @@ function toDiscovered(calendar: DAVCalendar): DiscoveredCalendar {
         ? calendar.displayName
         : "Untitled calendar",
     supportsEvents: components.length === 0 || components.includes("VEVENT"),
-    // If the server told us the privileges and write isn't among them, this
-    // calendar is a subscription — readable, but nothing can be added to it.
-    readOnly:
-      privileges !== "[]" && !/"write(-content)?"/.test(privileges),
+    readOnly: reportedReadOnly,
   };
+}
+
+async function listCalendars(
+  client: DavClient,
+): Promise<DiscoveredCalendar[]> {
+  const calendars = await client.fetchCalendars();
+  return calendars.map(toDiscovered).filter((c) => c.supportsEvents);
 }
 
 /** Verify credentials and list what's on the account. */
@@ -109,9 +120,21 @@ export async function discoverCalendars(
   password: string,
 ): Promise<DiscoveredCalendar[]> {
   try {
-    const client = await connect(serverUrl, username, password);
-    const calendars = await client.fetchCalendars();
-    return calendars.map(toDiscovered).filter((c) => c.supportsEvents);
+    return await listCalendars(await connect(serverUrl, username, password));
+  } catch (err) {
+    throw new Error(describeAuthFailure(err));
+  }
+}
+
+/**
+ * The same lookup for an account already connected, so calendars made in
+ * iCloud after connecting can still be found.
+ */
+export async function discoverCalendarsForAccount(
+  account: StoredAccount,
+): Promise<DiscoveredCalendar[]> {
+  try {
+    return await listCalendars(await clientForAccount(account));
   } catch (err) {
     throw new Error(describeAuthFailure(err));
   }

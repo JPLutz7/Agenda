@@ -1,6 +1,10 @@
 import { db } from "./db";
 import { expandIcs, fetchIcs } from "./ics";
-import { fetchCalendarDocuments, type StoredAccount } from "./caldav";
+import {
+  discoverCalendarsForAccount,
+  fetchCalendarDocuments,
+  type StoredAccount,
+} from "./caldav";
 
 /**
  * How much of the calendar we keep expanded locally. Recurring events are
@@ -166,8 +170,69 @@ export async function syncCalendar(
   }
 }
 
+/**
+ * Re-read the calendar list on every connected account.
+ *
+ * The list is discovered when an account is first connected, but people make
+ * calendars later — a shared "Apartment" one is usually created *because* they
+ * started using this app. Without this, a new calendar never appears and there
+ * is nothing in the interface to suggest why.
+ *
+ * Renames and permission changes are picked up too. Calendars that have gone
+ * from the account are dropped, along with their cached events.
+ */
+export async function reconcileCalendars(): Promise<void> {
+  const accounts = db
+    .prepare<[], StoredAccount>(
+      "SELECT id, server_url, username, password_enc FROM caldav_accounts",
+    )
+    .all();
+
+  for (const account of accounts) {
+    try {
+      const found = await discoverCalendarsForAccount(account);
+
+      // An account with no usable calendars is possible, but so is a partial
+      // response from a flaky server — and acting on the second would delete
+      // everything. Only reconcile when there's something to reconcile.
+      if (found.length === 0) continue;
+
+      const upsert = db.prepare(
+        `INSERT INTO caldav_calendars (account_id, url, display_name, read_only, enabled)
+         VALUES (?, ?, ?, ?, 1)
+         ON CONFLICT(account_id, url) DO UPDATE SET
+           display_name = excluded.display_name,
+           read_only    = excluded.read_only`,
+      );
+      const placeholders = found.map(() => "?").join(",");
+      const prune = db.prepare(
+        `DELETE FROM caldav_calendars
+         WHERE account_id = ? AND url NOT IN (${placeholders})`,
+      );
+
+      db.transaction(() => {
+        for (const c of found) {
+          upsert.run(account.id, c.url, c.displayName, c.readOnly ? 1 : 0);
+        }
+        prune.run(account.id, ...found.map((c) => c.url));
+        db.prepare(
+          "UPDATE caldav_accounts SET last_error = NULL WHERE id = ?",
+        ).run(account.id);
+      })();
+    } catch (err) {
+      db.prepare(
+        "UPDATE caldav_accounts SET last_error = ? WHERE id = ?",
+      ).run(err instanceof Error ? err.message : String(err), account.id);
+    }
+  }
+}
+
 /** Every source: published feeds and connected CalDAV calendars alike. */
 export async function syncAllFeeds(): Promise<SyncResult[]> {
+  // Find out what calendars exist before syncing them, so one added in iCloud
+  // shows up on the next refresh rather than never.
+  await reconcileCalendars();
+
   const feeds = db
     .prepare<[], FeedRow>("SELECT * FROM feeds ORDER BY id")
     .all();
