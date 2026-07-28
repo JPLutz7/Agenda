@@ -183,7 +183,12 @@ export function TimeGrid({
                 aria-label={`${day.weekdayShort} ${day.dayOfMonth}${
                   day.isToday ? ", today" : ""
                 }`}
-                className={`flex min-w-0 flex-col items-center gap-0.5 border-l border-border py-1.5 ${snapClass(
+                // Each cell paints its own background rather than relying on
+                // the row's. Safari doesn't paint the row's behind them, and
+                // the day column scrolling underneath showed through — the
+                // selected day's tint and its hour lines appearing as a band
+                // beside the date.
+                className={`flex min-w-0 flex-col items-center gap-0.5 border-l border-border bg-surface py-1.5 ${snapClass(
                   index,
                 )}`}
                 style={columnStyle}
@@ -277,7 +282,11 @@ export function TimeGrid({
                   createAt(day.day, e.currentTarget, e.clientY);
                 }}
                 onPointerUp={(e) => onColumnPointerUp(day.day, e)}
-                className={`relative min-w-0 border-l border-border ${snapClass(
+                // z-0 rather than the default auto: a column has to stay
+                // under the pinned header and hour axis. Safari let the
+                // selected day's tint — and with it the hour lines — paint
+                // over the header, leaving a stray band beside the date.
+                className={`relative z-0 min-w-0 border-l border-border ${snapClass(
                   index,
                 )} ${!single && index === selected ? "bg-surface-muted/50" : ""}`}
                 style={{ ...columnStyle, backgroundImage: HOUR_LINES }}
