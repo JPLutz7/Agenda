@@ -323,6 +323,30 @@ never be able to pass for a fresh lookup. `getSpentThisMonth` excludes Wants
 for the same reason: a price you observed on a television is not money spent on
 groceries.
 
+## Where things stand, as of the last session
+
+Working and deployed: everything above. In rough order of how recently it
+landed — link-and-Amazon pricing for Wants, per-item owner tags, editing for
+events/chores/list items, the refresh button in every page header, hand-typed
+Want prices, and notifications.
+
+**Waiting on the owner, not on code:**
+
+- `BESTBUY_API_KEY` is still unset in Fly secrets. Best Buy stopped issuing keys
+  to free email addresses, and the .edu route is blocked while he's in Brazil —
+  their verification wants a US location. Retrying from campus in August is the
+  plan. Nothing is broken meanwhile: Wants take a link or a typed price.
+- A scheduler pointed at `/api/refresh` each morning. Without one, chore
+  reminders only fire when somebody opens the app, which is the moment they'd
+  have seen the chore anyway. Any free cron service with the `AGENDA_CRON_SECRET`
+  bearer token does it; that secret is also currently unset.
+- The overlap decision below.
+
+**Ideas raised and not built** (the owner picked notifications from this list):
+who-owes-whom from the prices and owner tags already recorded; Google Calendar
+as a second source for his `@nd.edu` class schedule; weather on the Today
+screen; Notre Dame's academic calendar as a feed if they publish one.
+
 ## Worth a decision
 
 **Four-way overlaps are unreadable again.** Splitting a column evenly means
