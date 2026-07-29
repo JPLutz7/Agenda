@@ -43,6 +43,7 @@ import {
   refreshPricesIfStale,
   refreshWantPrices,
 } from "./prices";
+import { looksLikeUrl, shopName } from "./scrape";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -1065,36 +1066,76 @@ export async function addListItem(
     return { ok: "" };
   }
 
-  // A Want is stored as a search until a price check binds it to a real SKU,
-  // so nothing here has to know Best Buy's model numbering.
-  const info = db
-    .prepare(
-      `INSERT INTO list_items (text, added_by, category, retailer, retailer_query)
-       VALUES (?, ?, 'want', 'bestbuy', ?)`,
-    )
-    .run(itemText, addedBy, text(form, "search", 200) || itemText);
+  // Pasting a link is how you add anything Best Buy doesn't sell, and it
+  // needs no extra field: a URL is unmistakable, so the box takes either. The
+  // item is named from the page on the first check.
+  const pastedLink = looksLikeUrl(itemText);
 
-  const result = await refreshOneWant(Number(info.lastInsertRowid));
+  const info = pastedLink
+    ? db
+        .prepare(
+          `INSERT INTO list_items
+             (text, added_by, category, retailer, retailer_url)
+           VALUES (?, ?, 'want', 'link', ?)`,
+        )
+        .run(shopName(itemText), addedBy, itemText)
+    // Otherwise it's a Best Buy search, stored as text until a check binds it
+    // to a real SKU, so nothing here has to know their model numbering.
+    : db
+        .prepare(
+          `INSERT INTO list_items
+             (text, added_by, category, retailer, retailer_query)
+           VALUES (?, ?, 'want', 'bestbuy', ?)`,
+        )
+        .run(itemText, addedBy, text(form, "search", 200) || itemText);
+
+  const newId = Number(info.lastInsertRowid);
+  const result = await refreshOneWant(newId);
+  let label = itemText;
+
+  if (pastedLink) {
+    // A raw URL is a terrible name for a wish list. Take the product name the
+    // page gave us, and only here — a later check must not rename something
+    // the user has since called what they want to call it.
+    const named = db
+      .prepare<[number], { retailer_name: string | null }>(
+        "SELECT retailer_name FROM list_items WHERE id = ?",
+      )
+      .get(newId);
+    label = named?.retailer_name?.slice(0, 200) || shopName(itemText);
+    db.prepare("UPDATE list_items SET text = ? WHERE id = ?").run(label, newId);
+  }
+
   refreshViews();
   if (result.error) {
     // The item is kept either way — it's still something they want, it just
     // has no price yet.
-    return { ok: `Added "${itemText}". ${result.error}` };
+    return { ok: `Added "${label}". ${result.error}` };
   }
-  return { ok: `Added "${itemText}".` };
+  return { ok: `Added "${label}".` };
+}
+
+/** Where a Want's price comes from, as the edit form spells it. */
+function readPriceSource(form: FormData): "bestbuy" | "link" | null {
+  const raw = text(form, "source", 20);
+  if (raw === "link") return "link";
+  if (raw === "manual") return null;
+  return "bestbuy";
 }
 
 /**
- * Rename something on the list — and, for a Want, change what it searches for.
+ * Rename something on the list — and, for a Want, change where its price
+ * comes from.
  *
  * Renaming a Need re-reads the price memory under the new name, because the
  * memory is keyed by name: correcting "otmilk" to "oat milk" should pick up
  * what oat milk actually costs rather than keep a price filed under a typo.
  *
- * Retargeting a Want clears the bound SKU. The binding is the whole point of
- * the search text — first check finds the product, everything after goes
- * straight to it — so leaving the old SKU in place would mean the new wording
- * changed nothing and the price kept coming from the old television.
+ * A Want is re-checked when anything about *where* the price comes from
+ * changes — the source, the search text, or the link. Each of those clears the
+ * bound product, because the binding belongs to the old target: leaving a Best
+ * Buy SKU in place after switching to a link would mean the change did nothing
+ * and the price kept arriving from the old television.
  */
 export async function updateListItem(
   _prev: ActionState,
@@ -1109,8 +1150,17 @@ export async function updateListItem(
   if (!itemText) return { error: "It needs a name." };
 
   const item = db
-    .prepare<[number], { category: string; retailer_query: string | null }>(
-      "SELECT category, retailer_query FROM list_items WHERE id = ?",
+    .prepare<
+      [number],
+      {
+        category: string;
+        retailer: string | null;
+        retailer_query: string | null;
+        retailer_url: string | null;
+      }
+    >(
+      `SELECT category, retailer, retailer_query, retailer_url
+       FROM list_items WHERE id = ?`,
     )
     .get(itemId);
   if (!item) return { error: "That item no longer exists." };
@@ -1125,30 +1175,47 @@ export async function updateListItem(
     return { ok: `Saved "${itemText}".` };
   }
 
+  const source = readPriceSource(form);
   // Blank means "search for whatever it's called now", which is what someone
   // clearing the field is asking for.
   const query = text(form, "search", 200) || itemText;
-  const rebound = query !== item.retailer_query;
+  const link = text(form, "url", 500) || null;
+
+  if (source === "link" && !link) {
+    return { error: "Paste the product's web address, or pick another source." };
+  }
+  if (source === "link" && !looksLikeUrl(link!)) {
+    return { error: "That doesn't look like a web address — it should start with https://." };
+  }
+
+  const retargeted =
+    source !== item.retailer ||
+    (source === "bestbuy" && query !== item.retailer_query) ||
+    (source === "link" && link !== item.retailer_url);
 
   db.prepare(
     `UPDATE list_items
-     SET text = ?, added_by = ?, retailer_query = ?,
+     SET text = ?, added_by = ?, retailer = ?, retailer_query = ?,
+         retailer_url  = CASE WHEN ? THEN ? ELSE retailer_url END,
          retailer_sku  = CASE WHEN ? THEN NULL ELSE retailer_sku END,
-         retailer_url  = CASE WHEN ? THEN NULL ELSE retailer_url END,
          retailer_name = CASE WHEN ? THEN NULL ELSE retailer_name END,
          price_error   = NULL
      WHERE id = ?`,
   ).run(
     itemText,
     addedBy,
+    source,
     query,
-    rebound ? 1 : 0,
-    rebound ? 1 : 0,
-    rebound ? 1 : 0,
+    retargeted ? 1 : 0,
+    // A link keeps its URL; the other two have no business holding one, and a
+    // stale "View at Best Buy" against a hand-typed price is a small lie.
+    source === "link" ? link : null,
+    retargeted ? 1 : 0,
+    retargeted ? 1 : 0,
     itemId,
   );
 
-  if (rebound) {
+  if (retargeted && source !== null) {
     const result = await refreshOneWant(itemId);
     refreshViews();
     if (result.error) return { ok: `Saved "${itemText}". ${result.error}` };

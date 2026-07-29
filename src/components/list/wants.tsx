@@ -10,14 +10,15 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { Empty } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { OwnerTag } from "./owner";
-import { money, sinceLabel } from "./money";
+import { money, shopLabel, sinceLabel } from "./money";
 
 /**
  * Wants — the things you're saving up for.
  *
- * Unlike a grocery, a Want is one identifiable product, so a real retailer
- * lookup works. Best Buy publishes prices, so these update themselves and
- * show what's changed since the last check.
+ * Unlike a grocery, a Want is one identifiable product, so a real lookup
+ * works. Each one is priced by Best Buy's API, by reading the page at a link
+ * you pasted, or by hand — and says which, because "checked" and "you typed
+ * this in March" are not the same claim.
  */
 export function Wants({
   open,
@@ -37,14 +38,17 @@ export function Wants({
 }) {
   return (
     <>
-      {!hasApiKey && (
+      {/* Only when something actually depends on it. Link-priced items update
+          perfectly well without a Best Buy key, and warning about one they
+          don't use would be noise. */}
+      {!hasApiKey && open.some((item) => item.retailer === "bestbuy") && (
         <div className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
-          <p className="font-medium">Prices aren&rsquo;t updating on their own.</p>
+          <p className="font-medium">Best Buy prices aren&rsquo;t updating.</p>
           <p className="mt-1 text-muted">
-            Automatic prices need a free Best Buy API key set as{" "}
-            <code>BESTBUY_API_KEY</code> on the server. Until then, type in what
-            something costs and the list still tracks it — it just won&rsquo;t
-            claim to have checked.
+            That needs a free Best Buy API key set as{" "}
+            <code>BESTBUY_API_KEY</code> on the server. In the meantime you can
+            paste a link to the product at another shop, or type the price in —
+            the list tracks either, it just won&rsquo;t claim to have checked.
           </p>
         </div>
       )}
@@ -123,7 +127,7 @@ export function Wants({
                             rel="noopener noreferrer"
                             className="text-accent underline"
                           >
-                            View at Best Buy
+                            View at {shopLabel(item)}
                           </a>
                         </>
                       ) : null}
@@ -138,11 +142,13 @@ export function Wants({
 
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <EditItemLink item={item} tab="wants" />
-                    <form action={checkWantPrice.bind(null, item.id)}>
-                      <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
-                        Check
-                      </SubmitButton>
-                    </form>
+                    {item.retailer !== null && (
+                      <form action={checkWantPrice.bind(null, item.id)}>
+                        <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
+                          Check
+                        </SubmitButton>
+                      </form>
+                    )}
                     <form action={toggleListItem.bind(null, item.id)}>
                       <SubmitButton variant="danger" className="px-2 py-1 text-xs">
                         Got it

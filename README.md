@@ -21,6 +21,12 @@ to be a product.
   and that can be changed later — the washing-up liquid is everyone's, the
   protein powder isn't.
 
+Things you're saving up for (the **Wants** tab) get their prices three ways:
+Best Buy's API, reading the page at a link you paste, or typed in by hand. Each
+item picks its own and says which — a price that was looked up an hour ago and
+one you typed in March are not the same claim, so the app never words them the
+same way.
+
 Everything the app owns can be changed after the fact — tap an event and
 **Edit**, or use the pencil beside a chore or a list item. Events that came
 from an iCloud feed belong to whoever published them, and a chore's dates
@@ -98,8 +104,9 @@ Two things to know before you publish one:
 | `AGENDA_SECRET` | generated, stored in the DB | Signs session cookies, and derives the key that encrypts iCloud passwords. **Required** before an iCloud account can be connected. |
 | `AGENDA_CALDAV_URL` | `https://caldav.icloud.com` | The CalDAV server to connect to. Change it for Fastmail or a self-hosted server. |
 | `AGENDA_CRON_SECRET` | unset | Enables `GET /api/refresh` for an external scheduler. |
-| `BESTBUY_API_KEY` | unset | Free key from developer.bestbuy.com. Enables automatic prices on the Wants list; without it, prices can still be typed in by hand and the list says plainly that nothing was checked. |
+| `BESTBUY_API_KEY` | unset | Free key from developer.bestbuy.com. Enables Best Buy lookups on the Wants list. Link-priced and hand-typed items work without it. |
 | `BESTBUY_API_BASE` | `https://api.bestbuy.com/v1` | Overrides the API host, for testing against a stand-in. |
+| `AGENDA_SCRAPE_BASE` | unset | Rewrites the host of every product link before fetching, so the price-reading path can be tested against a local page. **Testing only** — it also exempts that host from the private-address check. |
 
 Set the household timezone in **Setup**. Every day boundary and chore due date
 is worked out in it.

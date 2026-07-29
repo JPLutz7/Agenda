@@ -96,7 +96,7 @@ export default async function ListPage({
             autoComplete="off"
             className={fieldClass}
             placeholder={
-              tab === "needs" ? "Paper towels" : 'LG 48" OLED evo B5'
+              tab === "needs" ? "Paper towels" : 'Product name, or paste a link'
             }
           />
           {people.length > 0 && (
@@ -110,7 +110,8 @@ export default async function ListPage({
         </div>
         {tab === "wants" && (
           <p className="mt-2 text-xs text-muted">
-            Word it the way Best Buy lists it and the price will find itself.
+            Type it the way Best Buy lists it, or paste a link to it at any
+            shop and the app will read the price off the page.
           </p>
         )}
       </ActionForm>

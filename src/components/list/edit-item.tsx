@@ -65,14 +65,43 @@ export function EditItemForm({
       </Field>
 
       {isWant && (
-        <Field label="Search Best Buy for">
-          <input
-            name="search"
-            autoComplete="off"
-            defaultValue={item.retailer_query ?? item.text}
-            className={fieldClass}
-          />
-        </Field>
+        <>
+          <Field label="Where the price comes from">
+            <select
+              name="source"
+              defaultValue={item.retailer ?? "manual"}
+              className={fieldClass}
+            >
+              <option value="bestbuy">Best Buy</option>
+              <option value="link">A link to the product</option>
+              <option value="manual">I&rsquo;ll type it in</option>
+            </select>
+          </Field>
+
+          {/* Both fields are always shown rather than swapped by a script:
+              only the one matching the source above is used, and seeing what
+              the other one still holds beats wondering where it went. */}
+          <Field label="Best Buy: search for">
+            <input
+              name="search"
+              autoComplete="off"
+              defaultValue={item.retailer_query ?? item.text}
+              className={fieldClass}
+            />
+          </Field>
+
+          <Field label="A link: the product&rsquo;s web address">
+            <input
+              name="url"
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              placeholder="https://…"
+              defaultValue={item.retailer_url ?? ""}
+              className={fieldClass}
+            />
+          </Field>
+        </>
       )}
 
       {people.length > 0 && (
@@ -87,8 +116,10 @@ export function EditItemForm({
 
       {isWant && (
         <p className="text-xs text-muted">
-          Changing the search unbinds the product it found last time and looks
-          again — which is the fix when the price is for the wrong model.
+          Changing the source, the search or the link makes the app look the
+          price up again from scratch — which is the fix when the price being
+          shown is for the wrong thing. Big shops like Amazon block automatic
+          checks; the app will say so and you can type the price in.
         </p>
       )}
 

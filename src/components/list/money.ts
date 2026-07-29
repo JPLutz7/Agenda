@@ -6,6 +6,26 @@ export function money(cents: number): string {
   }).format(cents / 100);
 }
 
+/**
+ * What to call the shop an item's price came from.
+ *
+ * Best Buy by name because that's a real integration; anything else by its
+ * own domain, which is both accurate and the thing the user recognises. Never
+ * a blanket "Best Buy" — the list stopped being only Best Buy the moment
+ * links arrived.
+ */
+export function shopLabel(item: {
+  retailer: string | null;
+  retailer_url: string | null;
+}): string {
+  if (item.retailer === "bestbuy") return "Best Buy";
+  try {
+    return new URL(item.retailer_url ?? "").hostname.replace(/^www\./, "");
+  } catch {
+    return "the shop";
+  }
+}
+
 /** '3h ago' — how old a price is. */
 function ageLabel(timestamp: string): string | null {
   // SQLite's datetime('now') is UTC without a zone marker.

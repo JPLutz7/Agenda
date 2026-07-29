@@ -239,6 +239,35 @@ stale number as though it were current — there is a test for exactly that.
 a stand-in. The first Want, the LG 48" B5 OLED, is seeded once in `db.ts` with
 no SKU on purpose: Best Buy's catalogue decides which product it is.
 
+**Wants are priced three ways** (`list_items.retailer`): `'bestbuy'` through
+the API, `'link'` by reading the page at `retailer_url`, or `NULL` for by hand.
+Pasting a URL into the add box picks `'link'` on its own and renames the item
+from the page — a raw URL is a terrible name for a wish list. `src/lib/scrape.ts`
+reads JSON-LD first, then Open Graph, then Amazon's own markup.
+
+**What actually works, measured rather than assumed.** One request each to
+twelve real shops, with the same parser the app uses:
+
+| Result | Shops |
+| --- | --- |
+| Blocked outright (403/503) | Best Buy web, B&H, Micro Center, Adorama, Home Depot, Etsy, REI, Newegg (bot wall behind a 200) |
+| Real page, no structured data | Amazon, Walmart, Target, IKEA |
+| Read correctly via JSON-LD | Ridge, Peak Design — i.e. the Shopify-shaped long tail |
+
+So the generic reader earns its place on smaller shops and is useless on
+megastores. Amazon is the exception worth special-casing and got one
+(`fromAmazon`): it serves the real page to a plain request, so the price comes
+out of `corePrice_feature_div`. **That is a promise about someone else's HTML
+and will break.** When it does the item says it couldn't find a price, which is
+the same thing any unreadable page says — never a number from the wrong element.
+
+**Fetching a URL a user typed is an SSRF sink**, and this one runs on Fly where
+169.254.169.254 is a real thing. `assertPublic()` resolves the hostname and
+refuses private, loopback, link-local, CGNAT and multicast addresses, and
+redirects are followed by hand so every hop is checked too. Ten cases are
+covered in `ssrf-e2e.js`; run it against a server with **no** `AGENDA_SCRAPE_BASE`,
+since that override deliberately rewrites every host and would mask the guard.
+
 **A Want's price can also be typed in** (`setWantPrice`), which is what makes
 the list useful before a key exists — and the key may be a while: Best Buy no
 longer issues them to free email addresses, and the owner's .edu application is
