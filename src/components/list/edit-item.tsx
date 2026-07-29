@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { updateListItem } from "@/lib/actions";
-import type { ListItem } from "@/lib/data";
+import type { ListItem, Person } from "@/lib/data";
 import { ActionForm, Field, SubmitButton, fieldClass } from "@/components/forms";
+import { OwnerSelect } from "./owner";
 
 /**
  * Renaming something on the list.
@@ -37,9 +38,11 @@ export function EditItemLink({
 
 export function EditItemForm({
   item,
+  people,
   tab,
 }: {
   item: ListItem;
+  people: Person[];
   tab: "needs" | "wants";
 }) {
   const isWant = tab === "wants";
@@ -67,6 +70,16 @@ export function EditItemForm({
             name="search"
             autoComplete="off"
             defaultValue={item.retailer_query ?? item.text}
+            className={fieldClass}
+          />
+        </Field>
+      )}
+
+      {people.length > 0 && (
+        <Field label="Whose it is">
+          <OwnerSelect
+            people={people}
+            selected={item.added_by}
             className={fieldClass}
           />
         </Field>

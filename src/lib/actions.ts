@@ -1030,13 +1030,27 @@ function priceToCents(raw: string): number | null {
   return Math.round(value * 100);
 }
 
+/**
+ * Whose an item is: a person id, or null for the apartment.
+ *
+ * The picker sends the literal 'household' for the flat. Anything unparseable
+ * lands on null too, which is the safe end — an item nobody is named on reads
+ * as shared, where a wrong name reads as an accusation about who wanted it.
+ */
+function readOwner(form: FormData): number | null {
+  const raw = text(form, "added_by", 20);
+  if (raw === "" || raw === "household") return null;
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 export async function addListItem(
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
   await requireSession();
   const itemText = text(form, "text", 200);
-  const addedBy = Number(text(form, "added_by", 20)) || null;
+  const addedBy = readOwner(form);
   const category = text(form, "category", 10) === "want" ? "want" : "need";
   if (!itemText) return { error: "" };
 
@@ -1090,6 +1104,7 @@ export async function updateListItem(
 
   const itemId = Number(text(form, "item_id", 20));
   const itemText = text(form, "text", 200);
+  const addedBy = readOwner(form);
   if (!itemId) return { error: "" };
   if (!itemText) return { error: "It needs a name." };
 
@@ -1102,8 +1117,10 @@ export async function updateListItem(
 
   if (item.category !== "want") {
     db.prepare(
-      `UPDATE list_items SET text = ?, last_price_cents = ? WHERE id = ?`,
-    ).run(itemText, recallPrice(itemText), itemId);
+      `UPDATE list_items
+       SET text = ?, added_by = ?, last_price_cents = ?
+       WHERE id = ?`,
+    ).run(itemText, addedBy, recallPrice(itemText), itemId);
     refreshViews();
     return { ok: `Saved "${itemText}".` };
   }
@@ -1115,7 +1132,7 @@ export async function updateListItem(
 
   db.prepare(
     `UPDATE list_items
-     SET text = ?, retailer_query = ?,
+     SET text = ?, added_by = ?, retailer_query = ?,
          retailer_sku  = CASE WHEN ? THEN NULL ELSE retailer_sku END,
          retailer_url  = CASE WHEN ? THEN NULL ELSE retailer_url END,
          retailer_name = CASE WHEN ? THEN NULL ELSE retailer_name END,
@@ -1123,6 +1140,7 @@ export async function updateListItem(
      WHERE id = ?`,
   ).run(
     itemText,
+    addedBy,
     query,
     rebound ? 1 : 0,
     rebound ? 1 : 0,

@@ -151,6 +151,17 @@ the form that creates it rather than growing a second copy:
   should find the real price). Retargeting a Want clears its bound SKU and
   re-searches — otherwise the new wording would change nothing.
 
+**Whose an item is.** `list_items.added_by` — a person id, or null for the
+apartment — set by `OwnerSelect` on both the add form and the edit form, and
+read by `readOwner()`, which maps the literal `'household'` (and anything it
+can't parse) to null. Null is now the *default* on the add form; it used to be
+`people[0].id`, which meant everything Nino added without touching the picker
+came out labelled João. An unlabelled item on a shared list belongs to the
+flat, and being wrong about whose protein powder it is costs more than being
+vague. `OwnerTag` renders the apartment in `HOUSEHOLD_COLOR` rather than
+rendering nothing, so choosing "Apartment" doesn't look like a save that
+failed.
+
 Moving an event between iCloud calendars is a create in the new one and a
 delete from the old, in that order: a failed create then leaves the original
 alone, where a failed create *after* a delete would lose the event entirely. If

@@ -13,6 +13,7 @@ import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
 import { Needs } from "@/components/list/needs";
 import { Wants } from "@/components/list/wants";
 import { money } from "@/components/list/money";
+import { OwnerSelect } from "@/components/list/owner";
 import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -99,18 +100,11 @@ export default async function ListPage({
             }
           />
           {people.length > 0 && (
-            <select
-              name="added_by"
-              defaultValue={people[0].id}
-              aria-label="Added by"
+            <OwnerSelect
+              people={people}
+              selected={null}
               className="rounded-lg border border-border bg-surface px-2 text-sm"
-            >
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
+            />
           )}
           <SubmitButton>Add</SubmitButton>
         </div>
@@ -127,6 +121,7 @@ export default async function ListPage({
             open={needsOpen}
             done={needsDone}
             estimate={estimate}
+            people={people}
             editId={editId}
           />
           {spent > 0 && (
@@ -149,6 +144,7 @@ export default async function ListPage({
             done={wantsDone}
             hasApiKey={hasApiKey()}
             nearestStore={store}
+            people={people}
             editId={editId}
           />
           {wantsDone.length > 0 && (

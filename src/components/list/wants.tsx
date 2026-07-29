@@ -5,10 +5,11 @@ import {
   setWantPrice,
   toggleListItem,
 } from "@/lib/actions";
-import type { ListItem } from "@/lib/data";
+import type { ListItem, Person } from "@/lib/data";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Empty } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
+import { OwnerTag } from "./owner";
 import { money, sinceLabel } from "./money";
 
 /**
@@ -23,12 +24,14 @@ export function Wants({
   done,
   hasApiKey,
   nearestStore,
+  people,
   editId,
 }: {
   open: ListItem[];
   done: ListItem[];
   hasApiKey: boolean;
   nearestStore: string | null;
+  people: Person[];
   /** The item whose edit form is open, from `?edit=`. */
   editId: number | null;
 }) {
@@ -66,7 +69,13 @@ export function Wants({
               >
                 <div className="flex items-start gap-3 p-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{item.text}</p>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="min-w-0 text-sm font-medium">{item.text}</p>
+                      <OwnerTag
+                        name={item.added_by_name}
+                        color={item.added_by_color}
+                      />
+                    </div>
                     {item.retailer_name && (
                       <p className="mt-0.5 truncate text-xs text-muted">
                         {item.retailer_name}
@@ -144,7 +153,7 @@ export function Wants({
 
                 {editId === item.id && (
                   <div className="border-t border-border px-3 pb-3">
-                    <EditItemForm item={item} tab="wants" />
+                    <EditItemForm item={item} people={people} tab="wants" />
                   </div>
                 )}
 

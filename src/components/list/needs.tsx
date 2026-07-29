@@ -3,10 +3,11 @@ import {
   setItemPrice,
   toggleListItem,
 } from "@/lib/actions";
-import type { ListItem } from "@/lib/data";
+import type { ListItem, Person } from "@/lib/data";
 import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
 import { Empty } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
+import { OwnerTag } from "./owner";
 import { money } from "./money";
 
 /**
@@ -21,11 +22,13 @@ export function Needs({
   open,
   done,
   estimate,
+  people,
   editId,
 }: {
   open: ListItem[];
   done: ListItem[];
   estimate: { totalCents: number; unpriced: number };
+  people: Person[];
   /** The item whose rename form is open, from `?edit=`. */
   editId: number | null;
 }) {
@@ -58,19 +61,17 @@ export function Needs({
                       </span>
                     )}
                   </span>
-                  {item.added_by_name && (
-                    <span
-                      className="shrink-0 text-xs"
-                      style={{ color: item.added_by_color ?? undefined }}
-                    >
-                      {item.added_by_name}
-                    </span>
-                  )}
+                  <OwnerTag
+                    name={item.added_by_name}
+                    color={item.added_by_color}
+                  />
                 </button>
               </form>
               <EditItemLink item={item} tab="needs" />
               </div>
-              {editId === item.id && <EditItemForm item={item} tab="needs" />}
+              {editId === item.id && (
+                <EditItemForm item={item} people={people} tab="needs" />
+              )}
             </li>
           ))}
         </ul>

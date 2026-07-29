@@ -16,7 +16,10 @@ to be a product.
   person — landlord visits, rent, a party — added in the app.
 - **Chores that rotate.** Set a chore and a cadence. Marking it done passes the
   turn to the other person and records who did it last.
-- **A shopping list.** Anyone adds, anyone ticks off.
+- **A shopping list.** Anyone adds, anyone ticks off. Each thing on it belongs
+  to the apartment or to one person, colour-coded the same way the calendar is,
+  and that can be changed later — the washing-up liquid is everyone's, the
+  protein powder isn't.
 
 Everything the app owns can be changed after the fact — tap an event and
 **Edit**, or use the pencil beside a chore or a list item. Events that came

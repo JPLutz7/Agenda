@@ -67,6 +67,8 @@ export type ListItem = {
   text: string;
   category: ListCategory;
   checked_at: string | null;
+  /** Whose it is: a person id, or null for the apartment. */
+  added_by: number | null;
   added_by_name: string | null;
   added_by_color: string | null;
   /** Needs: what it cost the last time it was ticked off. */
@@ -508,7 +510,7 @@ export function getWritableCalendars(): WritableCalendarOption[] {
 export function getListItems(): { open: ListItem[]; done: ListItem[] } {
   const rows = db
     .prepare<[], ListItem>(
-      `SELECT l.id, l.text, l.category, l.checked_at,
+      `SELECT l.id, l.text, l.category, l.checked_at, l.added_by,
               l.last_price_cents, l.last_price_at,
               l.retailer, l.retailer_query, l.retailer_sku,
               l.retailer_url, l.retailer_name,
