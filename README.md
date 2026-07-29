@@ -41,6 +41,7 @@ offering an edit that wouldn't stick.
 ```bash
 npm install
 npm run dev          # http://localhost:3000
+npm test             # the date, recurrence, price and layout tests
 ```
 
 The first page asks for both names and a household passcode. There are no user

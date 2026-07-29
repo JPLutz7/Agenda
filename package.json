@@ -6,11 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node scripts/start.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --conditions=react-server --test tests/*.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.1",
-    "date-fns": "^4.4.0",
+    "lucide-react": "^1.27.0",
     "next": "15.5.22",
     "node-ical": "^0.27.1",
     "react": "19.1.0",

@@ -364,17 +364,28 @@ function fromAmazon(html: string): ScrapedPrice | null {
  * rewrites the host so the whole path can be exercised against a local page
  * without depending on a real shop being up, or hammering one.
  */
+/**
+ * The price in a page's markup, or null if it isn't stated in any form we read.
+ *
+ * Separate from the fetching so it can be tested against saved markup — which
+ * is the half that breaks, since it's a set of promises about other people's
+ * HTML. `host` decides whether the shop-specific reader is allowed to run.
+ */
+export function extractPrice(html: string, host: string): ScrapedPrice | null {
+  return (
+    fromJsonLd(html) ??
+    fromMeta(html) ??
+    (/(^|\.)amazon\./i.test(host) ? fromAmazon(html) : null)
+  );
+}
+
 export async function fetchPrice(url: string): Promise<ScrapedPrice> {
   // The shop is whoever the *user* named. Under AGENDA_SCRAPE_BASE the fetched
   // host is a stand-in, and picking a parser by that would test the wrong one.
   const declaredHost = new URL(url).hostname;
   const { html, host } = await fetchPage(rewriteForTesting(url));
 
-  const found =
-    fromJsonLd(html) ??
-    fromMeta(html) ??
-    (/(^|\.)amazon\./i.test(declaredHost) ? fromAmazon(html) : null);
-
+  const found = extractPrice(html, declaredHost);
   if (!found) throw new NoPriceOnPage(shopName(url) || host);
   return found;
 }

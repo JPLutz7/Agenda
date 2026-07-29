@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { RefreshCw } from "lucide-react";
 
 /**
  * Pull now, rather than waiting.
@@ -25,21 +26,11 @@ export function RefreshButton() {
       title="Refresh"
       className="-m-1 rounded-lg p-2 text-muted transition-colors hover:text-foreground disabled:text-accent"
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      <RefreshCw
         className={`h-5 w-5 ${pending ? "animate-spin" : ""}`}
+        strokeWidth={1.8}
         aria-hidden="true"
-      >
-        <path d="M23 4v6h-6" />
-        <path d="M1 20v-6h6" />
-        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10" />
-        <path d="M3.51 15a9 9 0 0 0 14.85 3.36L23 14" />
-      </svg>
+      />
     </button>
   );
 }

@@ -245,3 +245,45 @@ export function describeDue(dueOn: DayKey, timeZone: string): string {
   if (diff < 0) return `${-diff} days late`;
   return `due in ${diff} days`;
 }
+
+/**
+ * '2026-07-27' + '18:30' in America/New_York → '2026-07-27T22:30:00.000Z'.
+ *
+ * Derives the zone's offset at that moment by formatting a provisional
+ * instant back into the zone and measuring the drift, which avoids pulling in
+ * a timezone library for the one place we need this direction.
+ */
+export function wallClockToUtc(date: string, time: string, timeZone: string): string {
+  const [hour, minute] = time.split(":").map(Number);
+  const naive = Date.parse(
+    `${date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`,
+  );
+
+  const offsetAt = (instant: number) => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(instant));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const asUtc = Date.UTC(
+      get("year"),
+      get("month") - 1,
+      get("day"),
+      get("hour"),
+      get("minute"),
+      get("second"),
+    );
+    return asUtc - instant;
+  };
+
+  // One correction pass, then a second to settle the DST boundary cases.
+  let instant = naive - offsetAt(naive);
+  instant = naive - offsetAt(instant);
+  return new Date(instant).toISOString();
+}

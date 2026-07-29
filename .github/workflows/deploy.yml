@@ -26,8 +26,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The gate. Nothing reaches the phones unless the date maths, the recurring
+  # event expansion, the price parsing and the calendar layout all still behave.
+  # These are the parts whose bugs are invisible until they're embarrassing:
+  # a class on the wrong day, a price that isn't the price.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+
   deploy:
     name: Build and deploy
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Get the code

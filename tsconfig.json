@@ -5,6 +5,9 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    // Tests import with explicit .ts, which is what node --experimental-strip-types
+    // resolves. noEmit is already on, so this costs the build nothing.
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",

@@ -60,11 +60,30 @@ credentials.
 
 ## Testing
 
-There is no test runner in the repo. Verification has been done by driving the
-built app in Chromium with Playwright, and against a local Radicale CalDAV
-server standing in for iCloud. That approach has caught real bugs repeatedly
-(a broken migration, silently dropped server actions, clipped calendar text) —
-prefer it over reasoning about whether something works.
+**`npm test`.** 33 unit tests over the four things whose bugs are invisible
+until they're embarrassing: the date and timezone maths (`tests/dates.test.ts`),
+recurring event expansion (`ics`), reading a price out of a page (`prices`), and
+where blocks go in the calendar grid (`layout`). They run in about a second, need
+no browser and no server, and **`.github/workflows/deploy.yml` will not deploy
+if they fail**.
+
+Two flags in the test script earn their place:
+
+- `--experimental-strip-types` runs the TypeScript directly, so there's no build
+  step and no second toolchain to keep in sync.
+- `--conditions=react-server` makes `import "server-only"` resolve to the
+  variant that doesn't throw. Without it, anything importing a server-only
+  module can't be unit tested at all.
+
+Anything with a database, a browser or a network call is still tested the way
+everything here has been: by driving the built app in Chromium with Playwright,
+against a local Radicale CalDAV server standing in for iCloud, a stub shop, and
+a stub push service. **Those scripts are not in the repo** and are the obvious
+next thing to commit — port them into `tests/e2e/` with `@playwright/test` and
+add them to the workflow. That approach has caught real bugs repeatedly (a broken
+migration, silently dropped server actions, clipped calendar text, an event that
+came back from the dead) — prefer it over reasoning about whether something
+works.
 
 ```
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers   # chromium is preinstalled
@@ -95,8 +114,21 @@ Want prices exist for. The handover is worth testing as one run: type a price
 with no key, restart with the stand-in, check, and confirm the typed figure is
 replaced while its history survives.
 
-`src/lib/layout.ts` (event placement) is a pure function and is worth testing
-directly rather than through the UI.
+**Two things were tested and turned out not to need fixing.** Both had been
+written up here as risks; the tests are the record that they aren't:
+
+- **Recurring events are handled correctly**, including a weekly repeat crossing
+  the November DST change (it keeps its local 7am rather than its UTC instant),
+  a single deleted occurrence via EXDATE, a single moved one via RECURRENCE-ID,
+  and an all-day monthly repeat. So `rrule` / `ical-expander` would buy nothing.
+  Don't swap `node-ical` out without a failing test in hand first.
+- **`wallClockToUtc` is correct**, including the 2:30am on 8 March that doesn't
+  exist and the 1:30am on 1 November that happens twice. It's hand-rolled with
+  two correction passes and looks alarming, which is why it now has nine tests
+  pinning it. Replacing it with Temporal would be a refactor with no behavioural
+  gain, and would cost either a Node 26 bump or a polyfill dependency. It lives
+  in `dates.ts` (moved there from `actions.ts`, since that's where the rule says
+  date maths goes).
 
 **Push is testable end to end without a phone.** A subscription endpoint is
 just a URL, so `push-service-stub.js` stands in for Apple's push service and the
@@ -393,13 +425,11 @@ sketchpad and bringing screenshots back here.
 
 ## Worth a decision
 
-**Four-way overlaps are unreadable again.** Splitting a column evenly means
-four overlapping events get a quarter of 116px each — 27px, narrower than a
-character, so those blocks show no text. That directly conflicts with the
-owner's instruction that "the title and time for the events should always be
-apparent on the calendar". The cascade this replaced kept every block at least
-52% wide but never reached the right edge. Neither is free; the owner should
-pick. Two or three abreast are fine either way.
+Nothing outstanding. The four-way-overlap question that sat here is settled:
+`layout.ts` caps at `MAX_COLUMNS = 3` and puts the rest behind an overflow chip,
+so every drawn block keeps at least a third of the column — enough for text,
+which is what the owner actually asked for. `tests/layout.test.ts` asserts both
+halves, including that a hidden fourth event doesn't shift the visible three.
 
 ## Next task
 
