@@ -154,7 +154,7 @@ export function EventModal({
                     </button>
                   )}
                   <form action={removeHouseholdEvent.bind(null, event.householdId)}>
-                    <SubmitButton variant="danger" className="px-0">
+                    <SubmitButton variant="danger" size="md">
                       Delete
                     </SubmitButton>
                   </form>

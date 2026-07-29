@@ -9,6 +9,7 @@ import { Empty } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { OwnerTag } from "./owner";
 import { money } from "./money";
+import { Check, Trash2 } from "lucide-react";
 
 /**
  * Needs — the groceries.
@@ -105,8 +106,8 @@ export function Needs({
                       type="submit"
                       className="flex w-full items-center gap-3 px-2 py-2 text-left"
                     >
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-[10px] text-white">
-                        ✓
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-white">
+                        <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm text-muted line-through">
                         {item.text}
@@ -128,10 +129,10 @@ export function Needs({
                             : ""
                         }
                         aria-label={`What ${item.text} cost`}
-                        placeholder="$"
+                        placeholder="—"
                         className={`${fieldClass} w-20 px-2 py-1 text-right text-sm`}
                       />
-                      <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
+                      <SubmitButton variant="quiet" size="sm">
                         Save
                       </SubmitButton>
                     </div>
@@ -142,10 +143,10 @@ export function Needs({
                   <form action={deleteListItem.bind(null, item.id)}>
                     <SubmitButton
                       variant="danger"
+                      size="icon"
                       title={`Delete ${item.text} permanently`}
-                      className="px-2 py-1"
                     >
-                      ✕
+                      <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                     </SubmitButton>
                   </form>
                 </div>

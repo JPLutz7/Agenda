@@ -11,6 +11,7 @@ import { Empty } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { OwnerTag } from "./owner";
 import { money, shopLabel, sinceLabel } from "./money";
+import { ArrowDown, ArrowUp, Check, Trash2, TriangleAlert } from "lucide-react";
 
 /**
  * Wants — the things you're saving up for.
@@ -40,17 +41,32 @@ export function Wants({
     <>
       {/* Only when something actually depends on it. Link-priced items update
           perfectly well without a Best Buy key, and warning about one they
-          don't use would be noise. */}
+          don't use would be noise.
+
+          One line, with the explanation folded away: it's a standing condition,
+          not an emergency, and six lines of amber every visit read as one. */}
       {!hasApiKey && open.some((item) => item.retailer === "bestbuy") && (
-        <div className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
-          <p className="font-medium">Best Buy prices aren&rsquo;t updating.</p>
-          <p className="mt-1 text-muted">
-            That needs a free Best Buy API key set as{" "}
-            <code>BESTBUY_API_KEY</code> on the server. In the meantime you can
-            paste a link to the product at another shop, or type the price in —
-            the list tracks either, it just won&rsquo;t claim to have checked.
+        <details className="group mb-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-muted">
+            <TriangleAlert
+              className="h-4 w-4 shrink-0 text-amber-500"
+              strokeWidth={1.8}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1">
+              Best Buy prices aren&rsquo;t updating
+            </span>
+            <span className="shrink-0 text-xs text-accent group-open:hidden">
+              Why?
+            </span>
+          </summary>
+          <p className="mt-2 text-muted">
+            It needs a free Best Buy API key set as <code>BESTBUY_API_KEY</code>{" "}
+            on the server. In the meantime you can paste a link to the product at
+            another shop, or type the price in — the list tracks either, it just
+            won&rsquo;t claim to have checked.
           </p>
-        </div>
+        </details>
       )}
 
       {open.length === 0 ? (
@@ -102,7 +118,11 @@ export function Wants({
                               dropped ? "text-emerald-600" : "text-red-500"
                             }`}
                           >
-                            {dropped ? "↓" : "↑"}{" "}
+                            {dropped ? (
+                              <ArrowDown className="inline h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+                            ) : (
+                              <ArrowUp className="inline h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+                            )}{" "}
                             {money(
                               Math.abs(
                                 price - (item.previous_price_cents ?? price),
@@ -144,13 +164,13 @@ export function Wants({
                     <EditItemLink item={item} tab="wants" />
                     {item.retailer !== null && (
                       <form action={checkWantPrice.bind(null, item.id)}>
-                        <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
+                        <SubmitButton variant="quiet" size="sm">
                           Check
                         </SubmitButton>
                       </form>
                     )}
                     <form action={toggleListItem.bind(null, item.id)}>
-                      <SubmitButton variant="danger" className="px-2 py-1 text-xs">
+                      <SubmitButton variant="quiet" size="sm">
                         Got it
                       </SubmitButton>
                     </form>
@@ -187,13 +207,10 @@ export function Wants({
                       inputMode="decimal"
                       autoComplete="off"
                       aria-label={`What ${item.text} costs now`}
-                      placeholder="$0.00"
+                      placeholder="—"
                       className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-right text-sm outline-none placeholder:text-muted focus:border-accent"
                     />
-                    <SubmitButton
-                      variant="quiet"
-                      className="shrink-0 px-2 py-1 text-xs"
-                    >
+                    <SubmitButton variant="quiet" size="sm">
                       Save
                     </SubmitButton>
                   </div>
@@ -206,7 +223,9 @@ export function Wants({
 
       <div className="mt-3 flex items-center gap-3">
         <form action={checkAllWantPrices}>
-          <SubmitButton variant="quiet">Check all prices</SubmitButton>
+          <SubmitButton variant="quiet" size="sm">
+            Check all prices
+          </SubmitButton>
         </form>
         {nearestStore && (
           <p className="text-xs text-muted">Nearest store: {nearestStore}</p>
@@ -229,8 +248,8 @@ export function Wants({
                     type="submit"
                     className="flex w-full items-center gap-3 px-2 py-2 text-left"
                   >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-[10px] text-white">
-                      ✓
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-white">
+                      <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm text-muted line-through">
                       {item.text}
@@ -245,10 +264,10 @@ export function Wants({
                 <form action={deleteListItem.bind(null, item.id)}>
                   <SubmitButton
                     variant="danger"
+                    size="icon"
                     title={`Delete ${item.text} permanently`}
-                    className="px-2 py-1"
                   >
-                    ✕
+                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                   </SubmitButton>
                 </form>
               </li>

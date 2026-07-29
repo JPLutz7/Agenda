@@ -4,33 +4,56 @@ import { useActionState, useEffect, useRef, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import type { ActionState } from "@/lib/actions";
 
+/**
+ * One button, three intents, three sizes — and nothing else.
+ *
+ * Every button in the app came through here already, but each caller was also
+ * passing its own padding, so "Done", "Check", "Got it" and "Save" ended up
+ * four different heights sitting next to each other. The sizes are named here
+ * instead: `md` for anything a thumb aims at deliberately, `sm` for controls
+ * riding along inside a row, `icon` for a square that holds one glyph.
+ */
+const VARIANTS = {
+  primary: "bg-accent text-white hover:opacity-90",
+  quiet: "border border-border bg-surface-muted text-foreground hover:border-muted",
+  danger: "text-muted hover:text-red-500 hover:bg-red-500/10",
+} as const;
+
+const SIZES = {
+  md: "rounded-lg px-3.5 py-2 text-sm",
+  sm: "rounded-md px-2.5 py-1.5 text-xs",
+  // Square, and at least 36px so it's still a fair target on a phone.
+  icon: "rounded-lg h-9 w-9 inline-flex items-center justify-center",
+} as const;
+
 export function SubmitButton({
   children,
   variant = "primary",
+  size = "md",
   className = "",
   title,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
-  variant?: "primary" | "quiet" | "danger";
+  variant?: keyof typeof VARIANTS;
+  size?: keyof typeof SIZES;
   className?: string;
   title?: string;
+  "aria-label"?: string;
 }) {
   const { pending } = useFormStatus();
-  const styles = {
-    primary: "bg-accent text-white hover:opacity-90",
-    quiet:
-      "border border-border bg-surface-muted text-foreground hover:border-muted",
-    danger: "text-muted hover:text-red-500",
-  }[variant];
 
   return (
     <button
       type="submit"
       disabled={pending}
       title={title}
-      className={`rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${styles} ${className}`}
+      aria-label={ariaLabel ?? title}
+      className={`shrink-0 font-medium transition disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
     >
-      {pending ? "…" : children}
+      {/* An icon button has no room for "…", and swapping the glyph for one
+          would resize the button mid-press. Fading is enough of a signal. */}
+      {pending && size !== "icon" ? "…" : children}
     </button>
   );
 }

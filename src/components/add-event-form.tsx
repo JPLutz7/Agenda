@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { addHouseholdEvent, updateHouseholdEvent } from "@/lib/actions";
 import type { Person, WritableCalendarOption } from "@/lib/data";
 import type { EditableEvent } from "@/components/calendar/types";
+import { X } from "lucide-react";
 import {
   ActionForm,
   Disclosure,
@@ -300,9 +301,9 @@ export function AddEventDialog({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-lg border border-border bg-surface-muted px-2 py-1 text-sm"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface-muted text-muted transition hover:text-foreground"
             >
-              ✕
+              <X className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
             </button>
           </div>
           <EventFields

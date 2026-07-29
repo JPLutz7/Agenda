@@ -32,6 +32,9 @@ export default async function HomePage() {
     writableCalendars,
   } = getDashboard();
   const dueNow = chores.filter((c) => c.overdue || c.dueToday);
+  // Passed down so today's list can dim what's already happened and mark what
+  // is next — the one question that screen exists to answer.
+  const nowIso = new Date().toISOString();
 
   // A calendar can arrive two ways — a published link or a connected iCloud
   // account — and both count. Checking only the published feeds told people
@@ -122,10 +125,20 @@ export default async function HomePage() {
         </>
       )}
 
-      <SectionTitle>Coming up</SectionTitle>
-      {visibleDays.map(({ day, events }) => (
-        <DaySection key={day} day={day} events={events} timeZone={timezone} />
-      ))}
+      {/* No "Coming up" heading: it was immediately followed by "Today",
+          which is two tiny grey labels where the day headings already say it. */}
+      <div className="mt-7">
+        {visibleDays.map(({ day, events }) => (
+          <DaySection
+            key={day}
+            day={day}
+            events={events}
+            timeZone={timezone}
+            /* Only today's list can have a "next" and a past. */
+            nowIso={day === today ? nowIso : undefined}
+          />
+        ))}
+      </div>
       {visibleDays.length <= 2 &&
         visibleDays.every((d) => d.events.length === 0) && (
           <p className="px-1 pb-2 text-sm text-muted">

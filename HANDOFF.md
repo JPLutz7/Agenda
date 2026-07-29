@@ -274,6 +274,26 @@ from `/api/refresh`. The honest limitation is in that first path: opening the ap
 is the moment you'd have seen the chore anyway, so a scheduler pointed at
 `/api/refresh` each morning is what makes it useful.
 
+**How it looks.** Four rules, all in `globals.css` and `ui.tsx`:
+
+- **Outfit for headings only** — bundled in `public/fonts` (SIL OFL, licence
+  beside it) rather than fetched from Google at build time, so a font CDN outage
+  can't fail a deploy and nothing the app serves phones home. Body text stays on
+  the system font, which is what people read fastest.
+- **Calendar blocks are tinted, not filled** (`tintedBlock` in `ui.tsx`). Solid
+  fills were legible but turned a busy week into a wall of paint and forced the
+  title into reversed-out white. A `color-mix` tint plus a solid left edge keeps
+  the title the darkest thing in the block and works in both schemes off one
+  `--tint-strength` token. `textOn()` in `colors.ts` is now unused by the
+  calendar — it's still right, just no longer needed there.
+- **`SubmitButton` owns its own sizes** (`md` / `sm` / `icon`). Every caller used
+  to pass its own padding, which is how Done, Check, Got it and Save ended up
+  four different heights side by side. Don't pass padding classes to it.
+- **No text characters standing in for icons.** ✕ ✎ ✓ ↑ ↓ were all glyphs, and
+  the pencil rendered as a coloured emoji on some platforms while everything
+  around it was grey — the single thing that most made the app look homemade.
+  They're lucide components now.
+
 **Colours.** `src/lib/colors.ts` is the one place they live: the apartment is
 gold, and each person keeps their own. Nino red and João blue were applied
 once by `applyRequestedColors` in `db.ts`, which leaves a `settings` marker so

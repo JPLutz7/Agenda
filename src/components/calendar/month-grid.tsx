@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { textOn } from "@/lib/colors";
+import { tintedBlock } from "@/components/ui";
 import type { CalDay, CalEvent } from "./types";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -109,16 +109,13 @@ export function MonthGrid({
                     onClick={() => onOpenEvent(event)}
                     title={`${event.timeLabel} · ${event.summary}`}
                     aria-label={`${event.timeLabel} ${event.summary}`}
-                    className="block w-full rounded-[2px] px-0.5 py-px text-left text-[8px] leading-[10px]"
-                    style={{
-                      backgroundColor: event.color,
-                      color: textOn(event.color),
-                    }}
+                    className="block w-full rounded-[2px] px-1 py-px text-left text-[8px] leading-[10px]"
+                    style={tintedBlock(event.color)}
                   >
                     {/* A month cell is ~46px wide. The time is abbreviated to
                         '7p' and given its own line so the title gets the full
                         width rather than the few characters left over. */}
-                    <span className="block truncate opacity-90">
+                    <span className="block truncate text-muted">
                       {event.allDay ? "all day" : event.compactTimeLabel}
                     </span>
                     <span className="block truncate font-medium">

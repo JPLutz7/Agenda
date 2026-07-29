@@ -15,6 +15,7 @@ import {
   fieldClass,
 } from "@/components/forms";
 import { Card, Empty } from "@/components/ui";
+import { Trash2 } from "lucide-react";
 
 export function ICloudSetup({
   accounts,
@@ -108,7 +109,7 @@ export function ICloudSetup({
                       ))}
                       <option value="household">The apartment</option>
                     </select>
-                    <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
+                    <SubmitButton variant="quiet" size="sm">
                       Save
                     </SubmitButton>
                   </form>
@@ -119,8 +120,11 @@ export function ICloudSetup({
                   )}
                 </div>
                 <form action={disconnectICloudAccount.bind(null, account.id)}>
-                  <SubmitButton variant="danger" className="px-2">
-                    ✕
+                  <SubmitButton
+                    variant="danger"
+                    size="icon"
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                   </SubmitButton>
                 </form>
               </div>
@@ -157,7 +161,7 @@ export function ICloudSetup({
                         name="enabled"
                         value={calendar.enabled ? "0" : "1"}
                       />
-                      <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
+                      <SubmitButton variant="quiet" size="sm">
                         {calendar.enabled ? "Hide" : "Show"}
                       </SubmitButton>
                     </form>

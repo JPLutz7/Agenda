@@ -96,7 +96,7 @@ export default async function ListPage({
             autoComplete="off"
             className={fieldClass}
             placeholder={
-              tab === "needs" ? "Paper towels" : 'Product name, or paste a link'
+              tab === "needs" ? "Paper towels" : "Product, or a link"
             }
           />
           {people.length > 0 && (
@@ -132,7 +132,7 @@ export default async function ListPage({
           )}
           {needsDone.length > 0 && (
             <form action={clearCheckedItems.bind(null, "need")} className="mt-3">
-              <SubmitButton variant="danger" className="px-2 py-1">
+              <SubmitButton variant="danger" size="sm">
                 Clear the cart
               </SubmitButton>
             </form>
@@ -150,7 +150,7 @@ export default async function ListPage({
           />
           {wantsDone.length > 0 && (
             <form action={clearCheckedItems.bind(null, "want")} className="mt-3">
-              <SubmitButton variant="danger" className="px-2 py-1">
+              <SubmitButton variant="danger" size="sm">
                 Clear bought
               </SubmitButton>
             </form>

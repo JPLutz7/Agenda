@@ -3,6 +3,7 @@ import { updateListItem } from "@/lib/actions";
 import type { ListItem, Person } from "@/lib/data";
 import { ActionForm, Field, SubmitButton, fieldClass } from "@/components/forms";
 import { OwnerSelect } from "./owner";
+import { Pencil } from "lucide-react";
 
 /**
  * Renaming something on the list.
@@ -29,9 +30,9 @@ export function EditItemLink({
     <Link
       href={`${listHref(tab)}${tab === "wants" ? "&" : "?"}edit=${item.id}`}
       title={`Edit ${item.text}`}
-      className="shrink-0 rounded-lg px-2 py-2 text-sm text-muted hover:text-foreground"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-muted hover:text-foreground"
     >
-      ✎
+      <Pencil className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
     </Link>
   );
 }

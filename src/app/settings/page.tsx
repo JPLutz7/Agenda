@@ -31,6 +31,7 @@ import {
   fieldClass,
 } from "@/components/forms";
 import { Card, Empty, PageHeader, SectionTitle } from "@/components/ui";
+import { Trash2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -126,9 +127,12 @@ export default async function SettingsPage({
                 )}
               </div>
               <form action={removeFeed.bind(null, feed.id)}>
-                <SubmitButton variant="danger" className="px-2">
-                  ✕
-                </SubmitButton>
+                <SubmitButton
+                    variant="danger"
+                    size="icon"
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+                  </SubmitButton>
               </form>
             </li>
           ))}
@@ -198,9 +202,12 @@ export default async function SettingsPage({
               {person.name}
             </span>
             <form action={removePerson.bind(null, person.id)}>
-              <SubmitButton variant="danger" className="px-2">
-                ✕
-              </SubmitButton>
+              <SubmitButton
+                    variant="danger"
+                    size="icon"
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+                  </SubmitButton>
             </form>
           </li>
         ))}
@@ -247,10 +254,10 @@ export default async function SettingsPage({
                 <form action={removePushDevice.bind(null, device.id)}>
                   <SubmitButton
                     variant="danger"
+                    size="icon"
                     title="Stop sending to this device"
-                    className="px-2"
                   >
-                    ✕
+                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                   </SubmitButton>
                 </form>
               </li>

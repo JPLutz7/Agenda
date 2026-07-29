@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { blockGeometry, placeEvents } from "@/lib/layout";
-import { textOn } from "@/lib/colors";
+import { tintedBlock } from "@/components/ui";
 import type { CalDay, CalEvent } from "./types";
 
 /**
@@ -24,6 +24,12 @@ import type { CalDay, CalEvent } from "./types";
  */
 
 const HOUR_HEIGHT = 56;
+/**
+ * Hour labels are centred on their line, so landing exactly on one puts half
+ * the label above the top edge — which reads as a rendering fault rather than
+ * as scroll position. A few pixels of clearance is all it takes.
+ */
+const LABEL_CLEARANCE = 10;
 const DAY_HEIGHT = HOUR_HEIGHT * 24;
 const AXIS_WIDTH = 44;
 /** Enough for "7 PM" above a few words of title. */
@@ -118,7 +124,10 @@ export function TimeGrid({
     const node = scroller.current;
     if (!node) return;
     node.scrollTo({
-      top: Math.max(0, (earliest / 60) * HOUR_HEIGHT - HOUR_HEIGHT),
+      top: Math.max(
+        0,
+        (earliest / 60) * HOUR_HEIGHT - HOUR_HEIGHT - LABEL_CLEARANCE,
+      ),
       left: single ? 0 : Math.max(0, selected * MIN_COLUMN - MIN_COLUMN),
     });
     // Paging to another week leaves the list holding last week's events.
@@ -261,11 +270,8 @@ export function TimeGrid({
                     // Timed blocks carry one too; without it a screen reader
                     // reads an all-day chip as an unlabelled button.
                     aria-label={`All day: ${event.summary}`}
-                    className="block h-5 w-full truncate rounded px-1 text-left text-[11px] font-medium leading-5"
-                    style={{
-                      backgroundColor: event.color,
-                      color: textOn(event.color),
-                    }}
+                    className="block h-5 w-full truncate rounded-sm px-1.5 text-left text-[11px] font-medium leading-5"
+                    style={tintedBlock(event.color)}
                   >
                     {event.summary}
                   </button>
@@ -326,20 +332,19 @@ export function TimeGrid({
                       onClick={() => onOpenEvent(event)}
                       title={`${event.timeLabel} · ${event.summary}`}
                       aria-label={`${event.timeLabel} ${event.summary}`}
-                      className="absolute overflow-hidden rounded px-1 py-px text-left leading-tight ring-1 ring-inset ring-white/25"
+                      className="absolute overflow-hidden rounded-sm px-1.5 py-px text-left leading-tight"
                       style={{
+                        ...tintedBlock(event.color),
                         top: `${top * 100}%`,
                         height: `${height * 100}%`,
                         left: `${event.left * 100}%`,
                         width: `calc(${event.width * 100}% - 2px)`,
-                        backgroundColor: event.color,
-                        color: textOn(event.color),
                         zIndex: 1 + event.column,
                       }}
                     >
                       {twoLines ? (
                         <>
-                          <span className="block truncate text-[10px] opacity-90">
+                          <span className="block truncate text-[10px] text-muted">
                             {event.timeLabel}
                           </span>
                           <span className="block truncate text-[11px] font-medium">
