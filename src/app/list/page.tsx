@@ -37,7 +37,7 @@ async function nearestStoreLabel(): Promise<string | null> {
 export default async function ListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; edit?: string }>;
 }) {
   await requireSignedIn();
   // Wants go stale on their own schedule; nudge a background refresh.
@@ -45,6 +45,7 @@ export default async function ListPage({
 
   const params = await searchParams;
   const tab: Tab = params.tab === "wants" ? "wants" : "needs";
+  const editId = Number(params.edit) || null;
 
   const { open, done } = getListItems();
   const people = getPeople();
@@ -122,7 +123,12 @@ export default async function ListPage({
 
       {tab === "needs" ? (
         <>
-          <Needs open={needsOpen} done={needsDone} estimate={estimate} />
+          <Needs
+            open={needsOpen}
+            done={needsDone}
+            estimate={estimate}
+            editId={editId}
+          />
           {spent > 0 && (
             <p className="mt-4 px-1 text-xs text-muted">
               Spent on groceries this month: {money(spent)}
@@ -143,6 +149,7 @@ export default async function ListPage({
             done={wantsDone}
             hasApiKey={hasApiKey()}
             nearestStore={store}
+            editId={editId}
           />
           {wantsDone.length > 0 && (
             <form action={clearCheckedItems.bind(null, "want")} className="mt-3">

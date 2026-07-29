@@ -1,4 +1,10 @@
-import { formatDayLabel, formatTime, type DayKey } from "@/lib/dates";
+import Link from "next/link";
+import {
+  eventDayKey,
+  formatDayLabel,
+  formatTime,
+  type DayKey,
+} from "@/lib/dates";
 import type { AgendaEvent } from "@/lib/data";
 import { removeHouseholdEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
@@ -25,11 +31,27 @@ export function EventRow({
         </p>
       </div>
       {event.source === "household" && event.householdId !== null ? (
-        <form action={removeHouseholdEvent.bind(null, event.householdId)}>
-          <SubmitButton variant="danger" title="Delete event" className="px-2">
-            ✕
-          </SubmitButton>
-        </form>
+        <>
+          {/* A link rather than a form: the editor is the calendar's dialog,
+              and duplicating it into every row of every list would mean two
+              of them to keep in step. */}
+          <Link
+            href={`/calendar?view=day&date=${eventDayKey(
+              event.startsAt,
+              event.allDay,
+              timeZone,
+            )}&edit=${event.householdId}`}
+            title={`Edit ${event.summary}`}
+            className="rounded-lg px-2 py-2 text-sm text-muted hover:text-foreground"
+          >
+            ✎
+          </Link>
+          <form action={removeHouseholdEvent.bind(null, event.householdId)}>
+            <SubmitButton variant="danger" title="Delete event" className="px-2">
+              ✕
+            </SubmitButton>
+          </form>
+        </>
       ) : null}
     </li>
   );

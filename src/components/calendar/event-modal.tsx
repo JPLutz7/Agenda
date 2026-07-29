@@ -3,20 +3,34 @@
 import { useEffect, useRef } from "react";
 import { removeHouseholdEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
+import { EventFields, type AddEventOptions } from "@/components/add-event-form";
 import type { CalEvent } from "./types";
 
 /**
- * Full detail for one event.
+ * Full detail for one event, and — for the ones this app owns — the form to
+ * change it.
  *
  * A block in the grid can only ever show a truncated title, so tapping it has
  * to lead somewhere that shows everything — time, whose it is, where.
  * Rendered as a <dialog> so the browser handles focus trapping and Escape.
+ *
+ * Editing happens in this same dialog rather than a second one. It's the same
+ * event either way, and stacking dialogs on a phone leaves you two Escapes
+ * from where you started.
  */
 export function EventModal({
   event,
+  addOptions,
+  editing,
+  onEditingChange,
   onClose,
 }: {
   event: CalEvent | null;
+  /** The choices the edit form needs — same ones the add form uses. */
+  addOptions: AddEventOptions;
+  /** Held by the caller so a link can open an event straight into its form. */
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -40,7 +54,38 @@ export function EventModal({
       // would otherwise use to centre itself, pinning it to the top.
       className="m-auto w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/40"
     >
-      {event && (
+      {event && editing && event.edit && (
+        <div>
+          <div
+            className="h-1.5 w-full rounded-t-2xl"
+            style={{ backgroundColor: event.color }}
+          />
+          <div className="p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold leading-snug">Edit event</h2>
+              <button
+                type="button"
+                onClick={() => onEditingChange(false)}
+                className="rounded-lg border border-border bg-surface-muted px-3 py-1.5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+            <EventFields
+              {...addOptions}
+              // Keyed on the event so opening a different one refills the
+              // fields rather than keeping the last event's title.
+              key={event.edit.id}
+              defaultDate={event.edit.date}
+              existing={event.edit}
+              submitLabel="Save changes"
+              onDone={onClose}
+            />
+          </div>
+        </div>
+      )}
+
+      {event && !(editing && event.edit) && (
         <div>
           <div
             className="h-1.5 w-full rounded-t-2xl"
@@ -98,11 +143,22 @@ export function EventModal({
 
             <div className="mt-6 flex items-center justify-between gap-3">
               {event.householdId !== null ? (
-                <form action={removeHouseholdEvent.bind(null, event.householdId)}>
-                  <SubmitButton variant="danger" className="px-0">
-                    Delete event
-                  </SubmitButton>
-                </form>
+                <div className="flex items-center gap-3">
+                  {event.edit && (
+                    <button
+                      type="button"
+                      onClick={() => onEditingChange(true)}
+                      className="rounded-lg border border-border bg-surface-muted px-4 py-2 text-sm font-medium"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <form action={removeHouseholdEvent.bind(null, event.householdId)}>
+                    <SubmitButton variant="danger" className="px-0">
+                      Delete
+                    </SubmitButton>
+                  </form>
+                </div>
               ) : event.source === "chore" ? (
                 // A chore's date is owned by the rotation, so it can't be
                 // edited here without the two disagreeing.

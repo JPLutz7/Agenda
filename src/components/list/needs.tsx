@@ -6,6 +6,7 @@ import {
 import type { ListItem } from "@/lib/data";
 import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
 import { Empty } from "@/components/ui";
+import { EditItemForm, EditItemLink } from "./edit-item";
 import { money } from "./money";
 
 /**
@@ -20,10 +21,13 @@ export function Needs({
   open,
   done,
   estimate,
+  editId,
 }: {
   open: ListItem[];
   done: ListItem[];
   estimate: { totalCents: number; unpriced: number };
+  /** The item whose rename form is open, from `?edit=`. */
+  editId: number | null;
 }) {
   return (
     <>
@@ -32,7 +36,8 @@ export function Needs({
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
           {open.map((item) => (
-            <li key={item.id} className="flex items-center gap-2 px-2 py-1">
+            <li key={item.id} className="px-2 py-1">
+              <div className="flex items-center gap-2">
               {/* min-w-0: a flex child won't shrink below its content by
                   default, so a long item name pushes the row wider than the
                   card instead of truncating inside it. */}
@@ -63,6 +68,9 @@ export function Needs({
                   )}
                 </button>
               </form>
+              <EditItemLink item={item} tab="needs" />
+              </div>
+              {editId === item.id && <EditItemForm item={item} tab="needs" />}
             </li>
           ))}
         </ul>

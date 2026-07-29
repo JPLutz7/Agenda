@@ -273,6 +273,38 @@ export async function createRemoteEvent(
   return { url, etag: response.headers?.get?.("etag") ?? null };
 }
 
+/**
+ * Rewrite an event already in iCloud, in place.
+ *
+ * The UID and the object URL both stay as they were, which is what makes this
+ * an edit rather than a new event: iCloud matches on UID, so changing it would
+ * leave the old one sitting in the calendar and add a second copy beside it.
+ */
+export async function updateRemoteEvent(
+  account: StoredAccount,
+  objectUrl: string,
+  etag: string | null,
+  event: OutgoingEvent,
+): Promise<WriteResult> {
+  const client = await clientForAccount(account);
+  const response = await client.updateCalendarObject({
+    calendarObject: {
+      url: objectUrl,
+      // No etag means no If-Match, so the write goes through regardless of
+      // what's there. We only get here for events this app created and owns.
+      etag: etag ?? "",
+      data: buildICalendar(event),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `iCloud rejected the change (${response.status} ${response.statusText}).`,
+    );
+  }
+  return { url: objectUrl, etag: response.headers?.get?.("etag") ?? null };
+}
+
 export async function deleteRemoteEvent(
   account: StoredAccount,
   objectUrl: string,

@@ -34,6 +34,7 @@ import {
   createRemoteEvent,
   deleteRemoteEvent,
   discoverCalendars,
+  updateRemoteEvent,
   type StoredAccount,
 } from "./caldav";
 import { canStoreSecrets, encryptSecret } from "./secrets";
@@ -407,6 +408,23 @@ export async function disconnectICloudAccount(
   refreshViews();
 }
 
+/**
+ * Drop a cached copy of an event we've just removed from iCloud.
+ *
+ * The `events` table is a mirror of what the last sync saw, and a sync only
+ * rebuilds a calendar when that calendar is pulled. So between deleting an
+ * event remotely and the next pull, the stale row is still there — and since
+ * the household row that used to claim it is gone (or has moved to a new UID),
+ * nothing suppresses it any more and it comes back on screen as if it were
+ * someone's own calendar event. Deleting an event and watching it reappear is
+ * about the worst thing a calendar can do, so the mirror is corrected here
+ * rather than left for the next sync.
+ */
+function forgetCachedEvent(uid: string | null): void {
+  if (!uid) return;
+  db.prepare("DELETE FROM events WHERE uid = ?").run(uid);
+}
+
 function writeAccountFor(calendarAccountId: number): StoredAccount | undefined {
   return db
     .prepare<[number], StoredAccount>(
@@ -417,12 +435,22 @@ function writeAccountFor(calendarAccountId: number): StoredAccount | undefined {
 
 /* -------------------------------------------------------- household events */
 
-export async function addHouseholdEvent(
-  _prev: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  await requireSession();
+type EventDraft = {
+  title: string;
+  notes: string | null;
+  startsAt: string;
+  endsAt: string;
+  allDay: boolean;
+};
 
+/**
+ * The event form, read once for both adding and editing.
+ *
+ * Shared deliberately rather than copied: the two forms are the same fields,
+ * and the validation here — an all-day toggle that overrides blank times, an
+ * end before its start — is exactly the part that would drift apart.
+ */
+function readEventForm(form: FormData): { draft?: EventDraft; error?: string } {
   const title = text(form, "title", 200);
   const date = text(form, "date", 10);
   const startTime = text(form, "start_time", 5);
@@ -443,45 +471,66 @@ export async function addHouseholdEvent(
     return { error: "Give it a start time, or turn on All day." };
   }
 
-  let startsAt: string;
-  let endsAt: string;
-
   if (allDay) {
-    startsAt = date;
-    endsAt = addDays(date, 1); // all-day DTEND is exclusive
-  } else {
-    // The form collects wall-clock time in the household timezone; convert to
-    // the UTC instant the rest of the app stores.
-    startsAt = wallClockToUtc(date, startTime, timezone());
-    endsAt = endTime
-      ? wallClockToUtc(date, endTime, timezone())
-      : new Date(Date.parse(startsAt) + 3_600_000).toISOString();
-    if (Date.parse(endsAt) < Date.parse(startsAt)) {
-      return { error: "The end time is before the start time." };
-    }
+    return {
+      draft: {
+        title,
+        notes,
+        startsAt: date,
+        endsAt: addDays(date, 1), // all-day DTEND is exclusive
+        allDay: true,
+      },
+    };
   }
 
-  // Where this one goes. The form sends a choice per event, pre-selected with
-  // the Setup default; a submission without the field (an older cached page)
-  // falls back to that default on its own.
-  let writeCalendar;
-  if (!form.has("calendar_id")) {
-    writeCalendar = getWriteCalendar();
-  } else {
-    const choice = text(form, "calendar_id", 20);
-    if (choice === "" || choice === "none") {
-      writeCalendar = null;
-    } else {
-      writeCalendar = getWritableCalendar(Number(choice));
-      if (!writeCalendar) {
-        return {
-          error:
-            "That calendar can't be written to any more. Pick another one, " +
-            "or check it in Setup.",
-        };
-      }
-    }
+  // The form collects wall-clock time in the household timezone; convert to
+  // the UTC instant the rest of the app stores.
+  const startsAt = wallClockToUtc(date, startTime, timezone());
+  const endsAt = endTime
+    ? wallClockToUtc(date, endTime, timezone())
+    : new Date(Date.parse(startsAt) + 3_600_000).toISOString();
+  if (Date.parse(endsAt) < Date.parse(startsAt)) {
+    return { error: "The end time is before the start time." };
   }
+  return { draft: { title, notes, startsAt, endsAt, allDay: false } };
+}
+
+/**
+ * Where an event goes. The form sends a choice per event, pre-selected with
+ * the Setup default; a submission without the field (an older cached page)
+ * falls back to that default on its own.
+ */
+function readCalendarChoice(
+  form: FormData,
+): { calendar?: ReturnType<typeof getWriteCalendar>; error?: string } {
+  if (!form.has("calendar_id")) return { calendar: getWriteCalendar() };
+  const choice = text(form, "calendar_id", 20);
+  if (choice === "" || choice === "none") return { calendar: null };
+
+  const calendar = getWritableCalendar(Number(choice));
+  if (!calendar) {
+    return {
+      error:
+        "That calendar can't be written to any more. Pick another one, " +
+        "or check it in Setup.",
+    };
+  }
+  return { calendar };
+}
+
+export async function addHouseholdEvent(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+
+  const read = readEventForm(form);
+  if (!read.draft) return { error: read.error };
+  const { title, notes, startsAt, endsAt, allDay } = read.draft;
+
+  const choice = readCalendarChoice(form);
+  if (choice.error) return { error: choice.error };
+  const writeCalendar = choice.calendar;
 
   // An iCloud calendar means the event belongs in iCloud first — that's what
   // makes it show up in the Calendar app on both phones rather than only here.
@@ -538,6 +587,170 @@ export async function addHouseholdEvent(
   };
 }
 
+type StoredHouseholdEvent = {
+  id: number;
+  title: string;
+  caldav_calendar_id: number | null;
+  caldav_url: string | null;
+  caldav_uid: string | null;
+  caldav_etag: string | null;
+};
+
+/**
+ * Change an event that was created here.
+ *
+ * Only these — a feed event belongs to whoever published it, and a chore's
+ * dates belong to the rotation. Both say so in the UI rather than offering an
+ * edit that couldn't stick.
+ *
+ * The awkward case is moving an event to a *different* iCloud calendar, which
+ * CalDAV has no move for: it's a create in the new one and a delete from the
+ * old. Done in that order on purpose. Creating first means a failure leaves the
+ * original untouched, and the worst case is a duplicate that gets reported —
+ * whereas deleting first would put a failed create between the user and an
+ * event that no longer exists anywhere.
+ */
+export async function updateHouseholdEvent(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+
+  const eventId = Number(text(form, "event_id", 20));
+  const existing = db
+    .prepare<[number], StoredHouseholdEvent>(
+      `SELECT id, title, caldav_calendar_id, caldav_url, caldav_uid, caldav_etag
+       FROM household_events WHERE id = ?`,
+    )
+    .get(eventId);
+  if (!existing) return { error: "That event no longer exists." };
+
+  const read = readEventForm(form);
+  if (!read.draft) return { error: read.error };
+  const { title, notes, startsAt, endsAt, allDay } = read.draft;
+
+  const choice = readCalendarChoice(form);
+  if (choice.error) return { error: choice.error };
+  const target = choice.calendar ?? null;
+
+  const stayingPut =
+    target !== null &&
+    existing.caldav_url !== null &&
+    existing.caldav_calendar_id === target.id;
+
+  let url = existing.caldav_url;
+  let uid = existing.caldav_uid;
+  let etag = existing.caldav_etag;
+  let strandedCopy = false;
+
+  try {
+    if (stayingPut) {
+      const account = writeAccountFor(target.account_id);
+      if (!account) return { error: "That iCloud account is no longer connected." };
+      const written = await updateRemoteEvent(
+        account,
+        existing.caldav_url!,
+        existing.caldav_etag,
+        {
+          uid: existing.caldav_uid ?? `agenda-${crypto.randomUUID()}`,
+          summary: title,
+          notes,
+          startsAt,
+          endsAt,
+          allDay,
+        },
+      );
+      url = written.url;
+      etag = written.etag;
+    } else {
+      // New home (or its first one): write there before touching the old copy.
+      if (target) {
+        const account = writeAccountFor(target.account_id);
+        if (!account) {
+          return { error: "That iCloud account is no longer connected." };
+        }
+        const newUid = `agenda-${crypto.randomUUID()}`;
+        const written = await createRemoteEvent(account, target.url, {
+          uid: newUid,
+          summary: title,
+          notes,
+          startsAt,
+          endsAt,
+          allDay,
+        });
+        uid = newUid;
+        url = written.url;
+        etag = written.etag;
+      } else {
+        url = null;
+        uid = null;
+        etag = null;
+      }
+
+      // Then clear out where it used to live.
+      if (existing.caldav_url && existing.caldav_calendar_id) {
+        const previous = db
+          .prepare<[number], { account_id: number }>(
+            "SELECT account_id FROM caldav_calendars WHERE id = ?",
+          )
+          .get(existing.caldav_calendar_id);
+        const account = previous ? writeAccountFor(previous.account_id) : undefined;
+        if (account) {
+          try {
+            await deleteRemoteEvent(
+              account,
+              existing.caldav_url,
+              existing.caldav_etag,
+            );
+            forgetCachedEvent(existing.caldav_uid);
+          } catch {
+            // The new copy is the real one now, so the edit still saves — but
+            // there's an orphan in the old calendar and the user is the only
+            // one who can clear it.
+            strandedCopy = true;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // Same rule as adding: don't save locally if iCloud didn't take it, or the
+    // app would show an edit the Calendar app has never heard of.
+    return {
+      error: `Couldn't save the change to iCloud: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    };
+  }
+
+  db.prepare(
+    `UPDATE household_events
+     SET title = ?, notes = ?, starts_at = ?, ends_at = ?, all_day = ?,
+         caldav_calendar_id = ?, caldav_url = ?, caldav_uid = ?, caldav_etag = ?
+     WHERE id = ?`,
+  ).run(
+    title,
+    notes,
+    startsAt,
+    endsAt,
+    allDay ? 1 : 0,
+    target?.id ?? null,
+    url,
+    uid,
+    etag,
+    eventId,
+  );
+
+  refreshViews();
+  if (strandedCopy) {
+    return {
+      ok:
+        `Saved "${title}", but the old copy couldn't be removed from the ` +
+        `calendar it was in. Delete that one in your Calendar app.`,
+    };
+  }
+  return { ok: `Saved "${title}".` };
+}
+
 /**
  * '2026-07-27' + '18:30' in America/New_York → '2026-07-27T22:30:00.000Z'.
  *
@@ -589,10 +802,11 @@ export async function removeHouseholdEvent(eventId: number): Promise<void> {
       {
         caldav_calendar_id: number | null;
         caldav_url: string | null;
+        caldav_uid: string | null;
         caldav_etag: string | null;
       }
     >(
-      `SELECT caldav_calendar_id, caldav_url, caldav_etag
+      `SELECT caldav_calendar_id, caldav_url, caldav_uid, caldav_etag
        FROM household_events WHERE id = ?`,
     )
     .get(eventId);
@@ -618,6 +832,7 @@ export async function removeHouseholdEvent(eventId: number): Promise<void> {
   }
 
   db.prepare("DELETE FROM household_events WHERE id = ?").run(eventId);
+  forgetCachedEvent(event.caldav_uid);
   refreshViews();
 }
 
@@ -653,6 +868,55 @@ export async function addChore(
 
   refreshViews();
   return { ok: `Added "${title}".` };
+}
+
+/**
+ * Change a chore's name, how often it comes round, whose it is, or when it's
+ * next due.
+ *
+ * `rotation_index` is left alone on purpose. It's the count of how many turns
+ * have been taken, and renaming the bins chore or moving it to Fridays doesn't
+ * mean the person who did it last should do it again.
+ */
+export async function updateChore(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+
+  const choreId = Number(text(form, "chore_id", 20));
+  const title = text(form, "title", 120);
+  const cadence = Number(text(form, "cadence_days", 5)) || 7;
+  const ownerRaw = text(form, "owner", 20);
+  const rotates = ownerRaw === "rotate";
+  const dueOn = text(form, "next_due_on", 10);
+
+  if (!choreId) return { error: "" };
+  if (!title) return { error: "The chore needs a name." };
+  if (cadence < 1 || cadence > 365) {
+    return { error: "Repeat every 1 to 365 days." };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { error: "Pick a due date." };
+
+  const info = db
+    .prepare(
+      `UPDATE chores
+       SET title = ?, cadence_days = ?, rotates = ?, fixed_owner_id = ?,
+           next_due_on = ?
+       WHERE id = ? AND archived = 0`,
+    )
+    .run(
+      title,
+      cadence,
+      rotates ? 1 : 0,
+      rotates ? null : Number(ownerRaw) || null,
+      dueOn,
+      choreId,
+    );
+  if (info.changes === 0) return { error: "That chore no longer exists." };
+
+  refreshViews();
+  return { ok: `Saved "${title}".` };
 }
 
 export async function completeChore(choreId: number): Promise<void> {
@@ -804,6 +1068,76 @@ export async function addListItem(
     return { ok: `Added "${itemText}". ${result.error}` };
   }
   return { ok: `Added "${itemText}".` };
+}
+
+/**
+ * Rename something on the list — and, for a Want, change what it searches for.
+ *
+ * Renaming a Need re-reads the price memory under the new name, because the
+ * memory is keyed by name: correcting "otmilk" to "oat milk" should pick up
+ * what oat milk actually costs rather than keep a price filed under a typo.
+ *
+ * Retargeting a Want clears the bound SKU. The binding is the whole point of
+ * the search text — first check finds the product, everything after goes
+ * straight to it — so leaving the old SKU in place would mean the new wording
+ * changed nothing and the price kept coming from the old television.
+ */
+export async function updateListItem(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+
+  const itemId = Number(text(form, "item_id", 20));
+  const itemText = text(form, "text", 200);
+  if (!itemId) return { error: "" };
+  if (!itemText) return { error: "It needs a name." };
+
+  const item = db
+    .prepare<[number], { category: string; retailer_query: string | null }>(
+      "SELECT category, retailer_query FROM list_items WHERE id = ?",
+    )
+    .get(itemId);
+  if (!item) return { error: "That item no longer exists." };
+
+  if (item.category !== "want") {
+    db.prepare(
+      `UPDATE list_items SET text = ?, last_price_cents = ? WHERE id = ?`,
+    ).run(itemText, recallPrice(itemText), itemId);
+    refreshViews();
+    return { ok: `Saved "${itemText}".` };
+  }
+
+  // Blank means "search for whatever it's called now", which is what someone
+  // clearing the field is asking for.
+  const query = text(form, "search", 200) || itemText;
+  const rebound = query !== item.retailer_query;
+
+  db.prepare(
+    `UPDATE list_items
+     SET text = ?, retailer_query = ?,
+         retailer_sku  = CASE WHEN ? THEN NULL ELSE retailer_sku END,
+         retailer_url  = CASE WHEN ? THEN NULL ELSE retailer_url END,
+         retailer_name = CASE WHEN ? THEN NULL ELSE retailer_name END,
+         price_error   = NULL
+     WHERE id = ?`,
+  ).run(
+    itemText,
+    query,
+    rebound ? 1 : 0,
+    rebound ? 1 : 0,
+    rebound ? 1 : 0,
+    itemId,
+  );
+
+  if (rebound) {
+    const result = await refreshOneWant(itemId);
+    refreshViews();
+    if (result.error) return { ok: `Saved "${itemText}". ${result.error}` };
+  } else {
+    refreshViews();
+  }
+  return { ok: `Saved "${itemText}".` };
 }
 
 /** Record what a Need actually cost, when ticking it off. */

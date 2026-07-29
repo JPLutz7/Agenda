@@ -20,6 +20,7 @@ import {
   formatTime,
   formatTimeCompact,
   formatTimeRange,
+  eventDayKey,
   isSameMonth,
   minutesIntoDay,
   monthGridRange,
@@ -42,6 +43,14 @@ export const dynamic = "force-dynamic";
 
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Minutes from midnight back to the 'HH:MM' an <input type="time"> wants. */
+function clockValue(minutes: number): string {
+  // 1440 is how the grid says "runs to the end of the day"; there is no 24:00
+  // for a time input, and a minute short of midnight is what was meant.
+  const m = Math.min(Math.max(minutes, 0), 1439);
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
 
 /** The span each scale covers, and how paging moves through it. */
 function periodFor(scale: CalendarScale, anchor: string) {
@@ -85,7 +94,7 @@ function periodFor(scale: CalendarScale, anchor: string) {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string }>;
+  searchParams: Promise<{ view?: string; date?: string; edit?: string }>;
 }) {
   await requireSignedIn();
   refreshIfStale();
@@ -142,6 +151,24 @@ export default async function CalendarPage({
       dateLabel: formatFullDate(day),
       source: event.source,
       householdId: event.householdId,
+      // Only events this app created can be edited, and only from the day
+      // they start on — the grid repeats a multi-day event on each of its
+      // days, and prefilling the form from the third of those would move it.
+      edit:
+        event.householdId !== null && day === eventDayKey(event.startsAt, event.allDay, tz)
+          ? {
+              id: event.householdId,
+              title: event.summary,
+              // A household event's "location" is its notes; nothing else
+              // fills that column for them.
+              notes: event.location ?? "",
+              date: day,
+              startTime: event.allDay ? "" : clockValue(startMinutes),
+              endTime: event.allDay ? "" : clockValue(endMinutes),
+              allDay: event.allDay,
+              calendarId: event.householdCalendarId,
+            }
+          : null,
     };
   };
 
@@ -228,6 +255,7 @@ export default async function CalendarPage({
         isCurrentPeriod={isCurrentPeriod}
         addOptions={addOptions}
         dayLabels={dayLabels}
+        editId={Number(params.edit) || null}
       />
 
       {people.length > 0 && scale !== "year" && (

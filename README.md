@@ -18,6 +18,12 @@ to be a product.
   turn to the other person and records who did it last.
 - **A shopping list.** Anyone adds, anyone ticks off.
 
+Everything the app owns can be changed after the fact — tap an event and
+**Edit**, or use the pencil beside a chore or a list item. Events that came
+from an iCloud feed belong to whoever published them, and a chore's dates
+belong to its rotation, so those two say where to change them instead of
+offering an edit that wouldn't stick.
+
 ## Running it
 
 ```bash

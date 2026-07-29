@@ -43,6 +43,7 @@ export function CalendarView({
   isCurrentPeriod,
   addOptions,
   dayLabels,
+  editId,
 }: {
   scale: CalendarScale;
   anchor: string;
@@ -59,9 +60,24 @@ export function CalendarView({
   addOptions: AddEventOptions;
   /** 'Tuesday, July 28, 2026' for each day on screen, keyed by day. */
   dayLabels: Record<string, string>;
+  /**
+   * A household event to open straight into its edit form, from `?edit=` —
+   * how the Today screen's pencil gets you here without a second tap.
+   */
+  editId: number | null;
 }) {
   const router = useRouter();
-  const [openEvent, setOpenEvent] = useState<CalEvent | null>(null);
+
+  // Read once, on mount. A later router.refresh() re-renders this component
+  // without remounting it, and re-opening the dialog every 45 seconds because
+  // the URL still says `edit=` would be unusable.
+  const [openEvent, setOpenEvent] = useState<CalEvent | null>(() =>
+    editId === null
+      ? null
+      : (days.flatMap((d) => d.events).find((e) => e.edit?.id === editId) ??
+        null),
+  );
+  const [editing, setEditing] = useState(() => openEvent !== null);
   /** The spot double-clicked on the grid, waiting to become an event. */
   const [draft, setDraft] = useState<{ date: string; time: string | null } | null>(
     null,
@@ -80,6 +96,12 @@ export function CalendarView({
   useEffect(() => {
     setSelected(defaultSelected);
   }, [anchor, scale, defaultSelected]);
+
+  // Always land on the details first; editing is a deliberate second tap.
+  const openDetails = (event: CalEvent) => {
+    setOpenEvent(event);
+    setEditing(false);
+  };
 
   const go = (nextScale: CalendarScale, date: string) =>
     router.push(`/calendar?view=${nextScale}&date=${date}`);
@@ -151,7 +173,7 @@ export function CalendarView({
           days={days}
           selected={selected}
           onSelect={setSelected}
-          onOpenEvent={setOpenEvent}
+          onOpenEvent={openDetails}
           onCreate={(day) => setDraft({ date: day, time: null })}
         />
       ) : (
@@ -159,7 +181,7 @@ export function CalendarView({
           days={days}
           selected={selected}
           onSelect={setSelected}
-          onOpenEvent={setOpenEvent}
+          onOpenEvent={openDetails}
           onCreate={(day, time) => setDraft({ date: day, time })}
           nowMinutes={nowMinutes}
         />
@@ -187,7 +209,16 @@ export function CalendarView({
         </div>
       )}
 
-      <EventModal event={openEvent} onClose={() => setOpenEvent(null)} />
+      <EventModal
+        event={openEvent}
+        addOptions={addOptions}
+        editing={editing}
+        onEditingChange={setEditing}
+        onClose={() => {
+          setOpenEvent(null);
+          setEditing(false);
+        }}
+      />
 
       <AddEventDialog
         {...addOptions}

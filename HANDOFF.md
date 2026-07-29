@@ -98,6 +98,13 @@ replaced while its history survives.
 `src/lib/layout.ts` (event placement) is a pure function and is worth testing
 directly rather than through the UI.
 
+**Check both sides of a write.** For anything that changes an event, assert
+against the CalDAV server with an independent `tsdav` client *and* against what
+the app shows. An edit that looks right in the app can be a create-plus-orphan
+on the server, and a delete that looks right on the server can still be showing
+in the app from the stale mirror. Both of those were real, and only the
+two-sided check caught them.
+
 ## Where things stand
 
 Working and deployed: merged calendars, two-way iCloud sync, day/week/month/
@@ -120,6 +127,44 @@ already filled in — quarter-hour rounded, see `timeAt` in `time-grid.tsx`.
 Touch screens don't fire a reliable `dblclick`, so taps are paired by hand
 from `pointerup`; mouse double-clicks use `onDoubleClick`. The same form also
 sits under the grid as a disclosure, as on the Today page.
+
+**Editing.** Events, chores and list items can all be changed after the fact.
+Three different UIs for three different shapes of thing, and each one reuses
+the form that creates it rather than growing a second copy:
+
+- *Events* — `updateHouseholdEvent`. The detail dialog gains an **Edit** button
+  that swaps its body for `EventFields` in edit mode; `readEventForm` and
+  `readCalendarChoice` are shared with `addHouseholdEvent`, so the validation
+  can't drift. Only household events qualify — `CalEvent.edit` is built on the
+  server (the date and times have to be worked out in the household timezone)
+  and is null for feed events and chores. It's also null on every day of a
+  multi-day event except the first, or editing from the third day would move it.
+  `EventRow` on Today links to `/calendar?view=day&date=…&edit=<id>`, which
+  `CalendarView` reads **once, on mount** — reading it on every render would
+  re-open the dialog every 45 seconds when `LiveRefresh` fires.
+- *Chores* — `updateChore`, in a `<details>` under each row. `rotation_index`
+  is deliberately untouched: renaming a chore doesn't mean the person who did
+  it last should go again.
+- *List items* — `updateListItem`, revealed by `?edit=<id>` so the page stays
+  server-rendered and the app's own refresh can't close the form mid-typing.
+  Renaming a Need re-reads `price_memory` under the new name (fixing a typo
+  should find the real price). Retargeting a Want clears its bound SKU and
+  re-searches — otherwise the new wording would change nothing.
+
+Moving an event between iCloud calendars is a create in the new one and a
+delete from the old, in that order: a failed create then leaves the original
+alone, where a failed create *after* a delete would lose the event entirely. If
+the delete fails the edit still saves and the user is told there's a copy left
+behind, because only they can clear it.
+
+**A deleted event could come back.** `events` is a mirror of what the last sync
+saw, and a sync only rebuilds a calendar when that calendar is pulled. Removing
+an event from iCloud therefore left a stale mirror row behind — and with the
+`household_events` row that used to suppress it gone (or moved to a new UID),
+nothing hid it any more and it reappeared as though it were an ordinary feed
+event. `forgetCachedEvent(uid)` corrects the mirror at the point of deletion,
+in both `removeHouseholdEvent` and the move path. This was found by the
+Radicale test, not by reading the code.
 
 **Colours.** `src/lib/colors.ts` is the one place they live: the apartment is
 gold, and each person keeps their own. Nino red and João blue were applied

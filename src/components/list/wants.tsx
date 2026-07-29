@@ -8,6 +8,7 @@ import {
 import type { ListItem } from "@/lib/data";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Empty } from "@/components/ui";
+import { EditItemForm, EditItemLink } from "./edit-item";
 import { money, sinceLabel } from "./money";
 
 /**
@@ -22,11 +23,14 @@ export function Wants({
   done,
   hasApiKey,
   nearestStore,
+  editId,
 }: {
   open: ListItem[];
   done: ListItem[];
   hasApiKey: boolean;
   nearestStore: string | null;
+  /** The item whose edit form is open, from `?edit=`. */
+  editId: number | null;
 }) {
   return (
     <>
@@ -124,6 +128,7 @@ export function Wants({
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-1">
+                    <EditItemLink item={item} tab="wants" />
                     <form action={checkWantPrice.bind(null, item.id)}>
                       <SubmitButton variant="quiet" className="px-2 py-1 text-xs">
                         Check
@@ -136,6 +141,12 @@ export function Wants({
                     </form>
                   </div>
                 </div>
+
+                {editId === item.id && (
+                  <div className="border-t border-border px-3 pb-3">
+                    <EditItemForm item={item} tab="wants" />
+                  </div>
+                )}
 
                 {/* Type the price in yourself. Useful whether or not the
                     lookup is working: no key yet, a shop that has no API, or

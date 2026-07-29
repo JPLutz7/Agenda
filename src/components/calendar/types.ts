@@ -28,6 +28,26 @@ export type CalEvent = {
   source: "feed" | "household" | "chore";
   /** Set only for events this app created, which it can also delete. */
   householdId: number | null;
+  /**
+   * The same event as the add form's own fields, for editing it in place.
+   * Null for anything this app doesn't own. Built on the server because the
+   * date and the times have to be worked out in the household timezone.
+   */
+  edit: EditableEvent | null;
+};
+
+export type EditableEvent = {
+  id: number;
+  title: string;
+  notes: string;
+  /** 'YYYY-MM-DD' in the household timezone. */
+  date: string;
+  /** 'HH:MM', blank for an all-day event. */
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+  /** Which iCloud calendar it currently lives in, if any. */
+  calendarId: number | null;
 };
 
 export type CalDay = {

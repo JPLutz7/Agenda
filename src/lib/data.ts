@@ -42,6 +42,8 @@ export type AgendaEvent = {
   color: string;
   source: "feed" | "household" | "chore";
   householdId: number | null;
+  /** Which iCloud calendar a household event was written to, if any. */
+  householdCalendarId: number | null;
 };
 
 export type ChoreView = {
@@ -72,6 +74,8 @@ export type ListItem = {
   last_price_at: string | null;
   /** Wants: the bound product and its current price. */
   retailer: string | null;
+  /** What a Want searches for until a SKU binds it. */
+  retailer_query: string | null;
   retailer_sku: string | null;
   retailer_url: string | null;
   retailer_name: string | null;
@@ -178,6 +182,7 @@ export function getChoreEvents(from: DayKey, to: DayKey): AgendaEvent[] {
           color: HOUSEHOLD_COLOR,
           source: "chore" as const,
           householdId: null,
+          householdCalendarId: null,
         });
       }
       day = addDays(day, cadence);
@@ -251,9 +256,10 @@ export function getEvents(
         starts_at: string;
         ends_at: string;
         all_day: number;
+        caldav_calendar_id: number | null;
       }
     >(
-      `SELECT id, title, notes, starts_at, ends_at, all_day
+      `SELECT id, title, notes, starts_at, ends_at, all_day, caldav_calendar_id
        FROM household_events
        WHERE ends_at >= ? AND starts_at <= ?`,
     )
@@ -271,6 +277,7 @@ export function getEvents(
       color: r.person_color ?? HOUSEHOLD_COLOR,
       source: "feed" as const,
       householdId: null,
+      householdCalendarId: null,
     })),
     ...householdRows.map((r) => ({
       key: `h${r.id}`,
@@ -283,6 +290,7 @@ export function getEvents(
       color: HOUSEHOLD_COLOR,
       source: "household" as const,
       householdId: r.id,
+      householdCalendarId: r.caldav_calendar_id,
     })),
     // Off by default: the Today screen lists what's due in its own section,
     // and having each chore appear twice on one screen helps nobody.
@@ -502,7 +510,8 @@ export function getListItems(): { open: ListItem[]; done: ListItem[] } {
     .prepare<[], ListItem>(
       `SELECT l.id, l.text, l.category, l.checked_at,
               l.last_price_cents, l.last_price_at,
-              l.retailer, l.retailer_sku, l.retailer_url, l.retailer_name,
+              l.retailer, l.retailer_query, l.retailer_sku,
+              l.retailer_url, l.retailer_name,
               l.price_cents, l.regular_price_cents, l.price_checked_at,
               l.price_error, l.price_source,
               p.name AS added_by_name, p.color AS added_by_color,

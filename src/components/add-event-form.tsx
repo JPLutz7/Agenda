@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { addHouseholdEvent } from "@/lib/actions";
+import { addHouseholdEvent, updateHouseholdEvent } from "@/lib/actions";
 import type { Person, WritableCalendarOption } from "@/lib/data";
+import type { EditableEvent } from "@/components/calendar/types";
 import {
   ActionForm,
   Disclosure,
@@ -43,7 +44,7 @@ export type AddEventOptions = {
  * connected there is nowhere to send it, so the picker stays hidden and the
  * event simply lives in the app.
  */
-function EventFields({
+export function EventFields({
   people,
   calendars,
   defaultCalendarId,
@@ -51,6 +52,7 @@ function EventFields({
   defaultStartTime = "",
   autoFocus = false,
   submitLabel = "Add to calendar",
+  existing,
   onDone,
 }: AddEventOptions & {
   defaultDate: string;
@@ -58,12 +60,15 @@ function EventFields({
   defaultStartTime?: string;
   autoFocus?: boolean;
   submitLabel?: string;
+  /** Set to edit an event in place instead of creating a new one. */
+  existing?: EditableEvent;
   onDone?: () => void;
 }) {
-  const [allDay, setAllDay] = useState(false);
-  const [start, setStart] = useState(defaultStartTime);
+  const [allDay, setAllDay] = useState(existing?.allDay ?? false);
+  const [start, setStart] = useState(existing?.startTime ?? defaultStartTime);
   const [end, setEnd] = useState(
-    defaultStartTime ? shiftTime(defaultStartTime, DEFAULT_MINUTES) : "",
+    existing?.endTime ??
+      (defaultStartTime ? shiftTime(defaultStartTime, DEFAULT_MINUTES) : ""),
   );
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -95,21 +100,30 @@ function EventFields({
 
   return (
     <ActionForm
-      action={addHouseholdEvent}
+      action={existing ? updateHouseholdEvent : addHouseholdEvent}
       className="space-y-3"
-      resetOnSuccess
+      // An edit keeps what it saved on screen; only a new event clears itself
+      // ready for the next one.
+      resetOnSuccess={!existing}
       onSuccess={() => {
-        setAllDay(false);
-        setStart("");
-        setEnd("");
+        if (!existing) {
+          setAllDay(false);
+          setStart("");
+          setEnd("");
+        }
         onDone?.();
       }}
     >
+      {existing && (
+        <input type="hidden" name="event_id" value={existing.id} />
+      )}
+
       <Field label="What">
         <input
           ref={titleRef}
           name="title"
           required
+          defaultValue={existing?.title ?? ""}
           className={fieldClass}
           placeholder="Landlord inspection"
         />
@@ -122,7 +136,7 @@ function EventFields({
               name="date"
               type="date"
               required
-              defaultValue={defaultDate}
+              defaultValue={existing?.date ?? defaultDate}
               className={fieldClass}
             />
           </Field>
@@ -171,14 +185,23 @@ function EventFields({
       )}
 
       <Field label="Notes">
-        <input name="notes" className={fieldClass} placeholder="Optional" />
+        <input
+          name="notes"
+          defaultValue={existing?.notes ?? ""}
+          className={fieldClass}
+          placeholder="Optional"
+        />
       </Field>
 
       {calendars.length > 0 && (
-        <Field label="Add it to">
+        <Field label={existing ? "Keep it in" : "Add it to"}>
           <select
             name="calendar_id"
-            defaultValue={defaultCalendarId ?? "none"}
+            defaultValue={
+              existing
+                ? (existing.calendarId ?? "none")
+                : (defaultCalendarId ?? "none")
+            }
             className={fieldClass}
           >
             <option value="none">This app only</option>
