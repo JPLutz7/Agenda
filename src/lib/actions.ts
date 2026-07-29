@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db, setSetting } from "./db";
 import {
+  devicePerson,
   endSession,
   isPasscodeSet,
   isSignedIn,
+  setDevicePerson,
   setPasscode,
   startSession,
   verifyPasscode,
@@ -44,6 +46,7 @@ import {
   refreshWantPrices,
 } from "./prices";
 import { looksLikeUrl, shopName } from "./scrape";
+import { notifyEveryone, notifyOthers } from "./push";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -238,6 +241,88 @@ export async function setTimezone(
   setSetting("timezone", tz);
   refreshViews();
   return { ok: `Timezone set to ${tz}.` };
+}
+
+/* ----------------------------------------------------------- notifications */
+
+/**
+ * Register a phone for notifications.
+ *
+ * The browser hands over an endpoint and two keys; all three go in as one row.
+ * `person_id` is asked for on the same screen because there is one shared
+ * passcode — without being told, the app cannot know whether the phone in its
+ * hand is João's or Nino's, and a chore reminder sent to the wrong one is worse
+ * than none.
+ */
+export async function savePushSubscription(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+
+  const endpoint = text(form, "endpoint", 800);
+  const p256dh = text(form, "p256dh", 300);
+  const auth = text(form, "auth", 200);
+  const label = text(form, "label", 60) || null;
+  const personRaw = text(form, "person_id", 20);
+  const personId = personRaw === "" || personRaw === "household"
+    ? null
+    : Number(personRaw) || null;
+
+  if (!endpoint || !p256dh || !auth) {
+    return { error: "Your browser didn't hand over a usable subscription." };
+  }
+
+  // Re-subscribing the same phone yields the same endpoint, so this updates in
+  // place rather than accumulating a row per visit to Setup.
+  db.prepare(
+    `INSERT INTO push_subscriptions (person_id, endpoint, p256dh, auth, label)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET
+       person_id = excluded.person_id,
+       p256dh    = excluded.p256dh,
+       auth      = excluded.auth,
+       label     = excluded.label,
+       last_error = NULL,
+       failures   = 0`,
+  ).run(personId, endpoint, p256dh, auth, label);
+
+  // Remember whose phone this is, so the app can tell "your roommate added
+  // something" from "you added something" — the session alone can't.
+  await setDevicePerson(personId);
+
+  refreshViews();
+  return { ok: "This phone will get notifications." };
+}
+
+export async function removePushDevice(deviceId: number): Promise<void> {
+  await requireSession();
+  db.prepare("DELETE FROM push_subscriptions WHERE id = ?").run(deviceId);
+  refreshViews();
+}
+
+/**
+ * Prove it works, from the phone you're holding.
+ *
+ * Takes no arguments on purpose — there's nothing to read from the form, and a
+ * function with fewer parameters still satisfies what ActionForm passes.
+ */
+export async function sendTestNotification(): Promise<ActionState> {
+  await requireSession();
+  const sent = await notifyEveryone({
+    title: "Agenda works",
+    body: "That's all this was for. Notifications are on.",
+    url: "/",
+    tag: "test",
+  });
+  if (sent === 0) {
+    return {
+      error:
+        "Nothing went out — no phone is registered yet, or the ones that " +
+        "were have since turned notifications off.",
+    };
+  }
+  return { ok: `Sent to ${sent} device${sent === 1 ? "" : "s"}.` };
 }
 
 /* ------------------------------------------------------------ icloud (dav) */
@@ -1062,6 +1147,7 @@ export async function addListItem(
       `INSERT INTO list_items (text, added_by, category, last_price_cents)
        VALUES (?, ?, 'need', ?)`,
     ).run(itemText, addedBy, recallPrice(itemText));
+    await announceListAddition(itemText);
     refreshViews();
     return { ok: "" };
   }
@@ -1106,6 +1192,7 @@ export async function addListItem(
     db.prepare("UPDATE list_items SET text = ? WHERE id = ?").run(label, newId);
   }
 
+  await announceListAddition(label);
   refreshViews();
   if (result.error) {
     // The item is kept either way — it's still something they want, it just
@@ -1113,6 +1200,27 @@ export async function addListItem(
     return { ok: `Added "${label}". ${result.error}` };
   }
   return { ok: `Added "${label}".` };
+}
+
+/**
+ * Tell the *other* phone something appeared on the list.
+ *
+ * Whose phone did the adding comes from the device cookie, not from the item's
+ * owner tag — those are different questions, and most items are tagged as the
+ * apartment's. Without knowing the adder this would buzz you about your own
+ * shopping, so a phone that never turned notifications on stays silent rather
+ * than guessing.
+ */
+async function announceListAddition(label: string): Promise<void> {
+  const adder = await devicePerson();
+  if (adder === null) return;
+  const name = getPeople().find((p) => p.id === adder)?.name;
+  await notifyOthers(adder, {
+    title: "Added to the shopping list",
+    body: name ? `${name} added ${label}.` : `Someone added ${label}.`,
+    url: "/list",
+    tag: "list-added",
+  });
 }
 
 /** Where a Want's price comes from, as the edit form spells it. */

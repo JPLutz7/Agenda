@@ -16,6 +16,8 @@ to be a product.
   person — landlord visits, rent, a party — added in the app.
 - **Chores that rotate.** Set a chore and a cadence. Marking it done passes the
   turn to the other person and records who did it last.
+- **Notifications.** A chore on the day it's yours, a price drop worth knowing
+  about, and anything your roommate adds to the list.
 - **A shopping list.** Anyone adds, anyone ticks off. Each thing on it belongs
   to the apartment or to one person, colour-coded the same way the calendar is,
   and that can be changed later — the washing-up liquid is everyone's, the
@@ -111,9 +113,24 @@ Two things to know before you publish one:
 Set the household timezone in **Setup**. Every day boundary and chore due date
 is worked out in it.
 
+### Notifications
+
+Turn them on per phone in **Setup → Notifications**. On iPhone the app must be
+added to the Home Screen first — iOS grants push only to installed web apps,
+and the panel says so rather than failing mysteriously.
+
+You're asked whose phone it is, because there's one shared passcode: it's the
+only way a chore reminder can reach whoever's turn it actually is.
+
+Nothing to configure and no keys to obtain — the app generates its own signing
+keys on first use and keeps them in the database.
+
 ### Keeping feeds warm
 
-Optional — the app already refreshes itself whenever someone opens it.
+Optional for calendars, and the thing that makes chore reminders reliable. The
+app sends a reminder when someone opens it, which is exactly the moment they'd
+have seen the chore anyway; a scheduler hitting this once each morning is what
+makes the notification arrive on its own.
 
 ```bash
 curl -H "Authorization: Bearer $AGENDA_CRON_SECRET" https://your-host/api/refresh
@@ -151,13 +168,15 @@ separate ways a phone web app goes stale:
   yesterday's agenda with nothing on screen admitting it. The app refreshes on
   foreground, on window focus, on coming back online, and on Safari's
   back/forward cache restore.
-- **The code changed.** Pages are served `no-store` and there is **no service
-  worker anywhere in this project** — that's the deliberate part. A service
-  worker serves its own cache first and needs a correct update dance to ever
-  let go of it, which is the usual reason an installed web app gets stuck on a
-  version from three deploys ago. Without one, a deploy reaches both phones the
-  next time either of you opens the app, with nothing to invalidate and no
-  "clear your cache" conversation.
+- **The code changed.** Pages are served `no-store`, and the one service worker
+  in the project (`public/sw.js`) **has no `fetch` handler** — that's the
+  deliberate part. A service worker that answers fetches serves its own cache
+  first and needs a correct update dance to ever let go of it, which is the
+  usual reason an installed web app gets stuck on a version from three deploys
+  ago. With nothing intercepting requests there is nothing to serve stale: a
+  deploy reaches both phones the next time either of you opens the app, with
+  nothing to invalidate and no "clear your cache" conversation. That file exists
+  only because notifications are impossible without it.
 
 A refresh will not fire while you're typing in a field — otherwise the form
 would re-render out from under the keyboard mid-word. It catches up as soon as

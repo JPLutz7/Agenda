@@ -7,6 +7,7 @@ import {
   searchProducts,
 } from "./bestbuy";
 import { fetchPrice, shopName } from "./scrape";
+import { notifyEveryone } from "./push";
 
 /**
  * Keeping Want prices current.
@@ -24,6 +25,11 @@ import { fetchPrice, shopName } from "./scrape";
  *
  * Anything else — `retailer` null — is priced by hand and never touched here.
  */
+
+/** Cents as '$248.00', for notification text. */
+function dollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 /** Prices don't move minute to minute; six hours is plenty. */
 export const PRICE_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
@@ -108,10 +114,15 @@ async function fromLink(item: WantRow): Promise<Found> {
   };
 }
 
+/** A drop worth interrupting someone about. */
+const NOTIFY_DROP_CENTS = 500;
+
 async function refreshWant(item: WantRow): Promise<PriceResult> {
   try {
     const found =
       item.retailer === "link" ? await fromLink(item) : await fromBestBuy(item);
+
+    const before = item.price_cents;
 
     db.transaction(() => {
       db.prepare(
@@ -132,6 +143,21 @@ async function refreshWant(item: WantRow): Promise<PriceResult> {
       );
       recordPrice(item.id, found.priceCents, item.retailer ?? "bestbuy");
     })();
+
+    // Worth a buzz: it got cheaper, by enough to care about. Rises are not
+    // notified — nobody needs waking up to be told a television costs more.
+    if (before !== null && before - found.priceCents >= NOTIFY_DROP_CENTS) {
+      await notifyEveryone({
+        title: `${item.text} dropped`,
+        body:
+          `Now ${dollars(found.priceCents)}, down ${dollars(before - found.priceCents)} ` +
+          `from ${dollars(before)}.`,
+        url: "/list?tab=wants",
+        // Per item, so two drops on two things both arrive, but a second drop
+        // on the same thing replaces the first rather than stacking.
+        tag: `price-${item.id}`,
+      }).catch(() => undefined);
+    }
 
     return {
       itemId: item.id,

@@ -93,3 +93,39 @@ export async function isSignedIn(): Promise<boolean> {
   const jar = await cookies();
   return tokenIsValid(jar.get(COOKIE_NAME)?.value);
 }
+
+/**
+ * Whose phone this is.
+ *
+ * There is one shared passcode, so the session says "somebody who lives here"
+ * and nothing more. That's fine for permission and useless for "your roommate
+ * added something" — which needs to know who *isn't* being told. Set when
+ * notifications are turned on, since that's the one moment the app already has
+ * to ask, and read back here.
+ *
+ * Not httpOnly-sensitive and not a permission: worst case someone re-labels
+ * their own phone and gets their own notifications.
+ */
+const DEVICE_COOKIE = "agenda_device_person";
+
+export async function setDevicePerson(personId: number | null): Promise<void> {
+  const jar = await cookies();
+  if (personId === null) {
+    jar.delete(DEVICE_COOKIE);
+    return;
+  }
+  jar.set(DEVICE_COOKIE, String(personId), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 365 * 86_400,
+  });
+}
+
+export async function devicePerson(): Promise<number | null> {
+  const jar = await cookies();
+  const raw = jar.get(DEVICE_COOKIE)?.value;
+  const id = Number(raw);
+  return raw && Number.isInteger(id) && id > 0 ? id : null;
+}

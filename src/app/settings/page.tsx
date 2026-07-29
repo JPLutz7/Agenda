@@ -7,13 +7,17 @@ import {
   timezone,
 } from "@/lib/data";
 import { canStoreSecrets } from "@/lib/secrets";
+import { getDevices, publicKey } from "@/lib/push";
 import { ICloudSetup } from "@/components/icloud-setup";
+import { PushSetup } from "@/components/push-setup";
 import {
   addFeed,
   addPerson,
   refreshFeeds,
   removeFeed,
   removePerson,
+  removePushDevice,
+  sendTestNotification,
   setTimezone,
   signOut,
   updatePersonColor,
@@ -43,6 +47,8 @@ export default async function SettingsPage({
   const accounts = getCalDavAccounts();
   const writeCalendar = getWriteCalendar();
   const secretsAvailable = canStoreSecrets();
+  const devices = getDevices();
+  const vapidPublicKey = publicKey();
 
   return (
     <>
@@ -213,6 +219,50 @@ export default async function SettingsPage({
           </ActionForm>
         </Disclosure>
       </div>
+
+      <SectionTitle>Notifications</SectionTitle>
+      <Card className="p-4">
+        <PushSetup people={people} vapidPublicKey={vapidPublicKey} />
+      </Card>
+
+      {devices.length > 0 && (
+        <>
+          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+            {devices.map((device) => (
+              <li
+                key={device.id}
+                className="flex items-center gap-2 px-4 py-3 text-sm"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {device.person_name ?? "Unassigned"}
+                    {device.label ? ` · ${device.label}` : ""}
+                  </span>
+                  <span className="block text-xs text-muted">
+                    {device.last_sent_at
+                      ? `Last notified ${device.last_sent_at.slice(0, 10)}`
+                      : "Nothing sent yet"}
+                  </span>
+                </span>
+                <form action={removePushDevice.bind(null, device.id)}>
+                  <SubmitButton
+                    variant="danger"
+                    title="Stop sending to this device"
+                    className="px-2"
+                  >
+                    ✕
+                  </SubmitButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3">
+            <ActionForm action={sendTestNotification}>
+              <SubmitButton variant="quiet">Send a test</SubmitButton>
+            </ActionForm>
+          </div>
+        </>
+      )}
 
       <SectionTitle>Timezone</SectionTitle>
       <Card className="p-4">

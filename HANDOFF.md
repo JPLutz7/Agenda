@@ -98,6 +98,14 @@ replaced while its history survives.
 `src/lib/layout.ts` (event placement) is a pure function and is worth testing
 directly rather than through the UI.
 
+**Push is testable end to end without a phone.** A subscription endpoint is
+just a URL, so `push-service-stub.js` stands in for Apple's push service and the
+real send path runs for real — VAPID signing, aes128gcm encryption, 410 pruning,
+per-person routing. Two things to know: the stub must be **HTTPS** (web-push
+will not downgrade), so it uses a self-signed cert and the app runs with
+`NODE_TLS_REJECT_UNAUTHORIZED=0` for that test only; and the fake subscription
+needs a real P-256 key pair, or encryption fails before anything is sent.
+
 **Check both sides of a write.** For anything that changes an event, assert
 against the CalDAV server with an independent `tsdav` client *and* against what
 the app shows. An edit that looks right in the app can be a create-plus-orphan
@@ -176,6 +184,38 @@ nothing hid it any more and it reappeared as though it were an ordinary feed
 event. `forgetCachedEvent(uid)` corrects the mirror at the point of deletion,
 in both `removeHouseholdEvent` and the move path. This was found by the
 Radicale test, not by reading the code.
+
+**Notifications** (`src/lib/push.ts`, `public/sw.js`, `src/components/push-setup.tsx`).
+Web push with VAPID via the `web-push` package. Keys are generated on first use
+and kept in `settings`, unencrypted on purpose: the private key is only useful
+alongside the subscription endpoints, which are in the same database, so
+encrypting one of the two would be theatre. Losing them costs a re-subscribe per
+phone, nothing more.
+
+**The service worker is the exception to this project's own rule, and it must
+stay narrow.** `public/sw.js` handles `push` and `notificationclick` and has
+**no `fetch` handler**. That is the whole reason a deploy still reaches both
+phones immediately — a worker that answers fetches serves its cache first, which
+is how installed web apps get stuck three versions back. There is a test
+asserting the absence of a fetch handler and of any cache use; if it ever fails,
+somebody has traded away the thing that makes this app trustworthy. Fix the
+code, not the test.
+
+**Who a notification goes to.** There is one shared passcode, so the session
+says "somebody who lives here" and nothing more. Two separate mechanisms fill
+the gap: `push_subscriptions.person_id`, asked for when notifications are turned
+on, routes a chore reminder to whoever's turn it is; and an `agenda_device_person`
+cookie set at the same moment lets `addListItem` tell "your roommate added
+something" from "you added something". Without the cookie the list notification
+is skipped rather than guessed at — buzzing you about your own shopping is worse
+than silence.
+
+What fires: a chore due today (once per chore per day, marked in `settings`), a
+price drop of $5 or more (never a rise), and a list addition. Chore reminders
+run from `notifyChoresDueInBackground()` on the Today and Chores pages **and**
+from `/api/refresh`. The honest limitation is in that first path: opening the app
+is the moment you'd have seen the chore anyway, so a scheduler pointed at
+`/api/refresh` each morning is what makes it useful.
 
 **Colours.** `src/lib/colors.ts` is the one place they live: the apartment is
 gold, and each person keeps their own. Nino red and João blue were applied
