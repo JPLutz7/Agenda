@@ -2,10 +2,11 @@ import {
   checkAllWantPrices,
   checkWantPrice,
   deleteListItem,
+  setWantPrice,
   toggleListItem,
 } from "@/lib/actions";
 import type { ListItem } from "@/lib/data";
-import { SubmitButton } from "@/components/forms";
+import { ActionForm, SubmitButton } from "@/components/forms";
 import { Empty } from "@/components/ui";
 import { money, sinceLabel } from "./money";
 
@@ -31,12 +32,12 @@ export function Wants({
     <>
       {!hasApiKey && (
         <div className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
-          <p className="font-medium">Prices aren&rsquo;t updating yet.</p>
+          <p className="font-medium">Prices aren&rsquo;t updating on their own.</p>
           <p className="mt-1 text-muted">
-            This needs a free Best Buy API key set as{" "}
-            <code>BESTBUY_API_KEY</code> on the server. Until then Wants are
-            just a list — better that than showing a price that might be months
-            old as though it were today&rsquo;s.
+            Automatic prices need a free Best Buy API key set as{" "}
+            <code>BESTBUY_API_KEY</code> on the server. Until then, type in what
+            something costs and the list still tracks it — it just won&rsquo;t
+            claim to have checked.
           </p>
         </div>
       )}
@@ -90,7 +91,7 @@ export function Wants({
                                 price - (item.previous_price_cents ?? price),
                               ),
                             )}{" "}
-                            since last check
+                            since last time
                           </span>
                         )}
                       </p>
@@ -99,7 +100,7 @@ export function Wants({
                     )}
 
                     <p className="mt-1 text-xs text-muted">
-                      {sinceLabel(item.price_checked_at)}
+                      {sinceLabel(item.price_checked_at, item.price_source)}
                       {item.retailer_url ? (
                         <>
                           {" · "}
@@ -135,6 +136,42 @@ export function Wants({
                     </form>
                   </div>
                 </div>
+
+                {/* Type the price in yourself. Useful whether or not the
+                    lookup is working: no key yet, a shop that has no API, or
+                    a match that came back as the wrong model. */}
+                <ActionForm
+                  action={setWantPrice}
+                  className="border-t border-border px-3 py-2"
+                  resetOnSuccess
+                >
+                  <input type="hidden" name="item_id" value={item.id} />
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor={`want-price-${item.id}`}
+                      className="shrink-0 text-xs text-muted"
+                    >
+                      {price === null ? "What does it cost?" : "New price?"}
+                    </label>
+                    {/* Not `fieldClass`: its w-full collapses to nothing next
+                        to the label, leaving a box too narrow to read. */}
+                    <input
+                      id={`want-price-${item.id}`}
+                      name="price"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      aria-label={`What ${item.text} costs now`}
+                      placeholder="$0.00"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-right text-sm outline-none placeholder:text-muted focus:border-accent"
+                    />
+                    <SubmitButton
+                      variant="quiet"
+                      className="shrink-0 px-2 py-1 text-xs"
+                    >
+                      Save
+                    </SubmitButton>
+                  </div>
+                </ActionForm>
               </li>
             );
           })}

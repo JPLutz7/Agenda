@@ -204,7 +204,11 @@ function migrate(db: Database.Database) {
       price_cents         INTEGER,
       regular_price_cents INTEGER,
       price_checked_at    TEXT,
-      price_error         TEXT
+      price_error         TEXT,
+      -- Where price_cents came from: 'manual' if a person typed it, otherwise
+      -- the retailer. Worth a column of its own so the app never claims to
+      -- have checked a price it was simply told.
+      price_source        TEXT
     );
 
     -- Every price ever seen, from either method. Enough to say "cheaper than
@@ -280,6 +284,7 @@ function migrate(db: Database.Database) {
     ["regular_price_cents", "INTEGER"],
     ["price_checked_at", "TEXT"],
     ["price_error", "TEXT"],
+    ["price_source", "TEXT"],
   ] as const) {
     if (listColumns.includes(name)) continue;
     try {

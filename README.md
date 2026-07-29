@@ -89,7 +89,7 @@ Two things to know before you publish one:
 | `AGENDA_SECRET` | generated, stored in the DB | Signs session cookies, and derives the key that encrypts iCloud passwords. **Required** before an iCloud account can be connected. |
 | `AGENDA_CALDAV_URL` | `https://caldav.icloud.com` | The CalDAV server to connect to. Change it for Fastmail or a self-hosted server. |
 | `AGENDA_CRON_SECRET` | unset | Enables `GET /api/refresh` for an external scheduler. |
-| `BESTBUY_API_KEY` | unset | Free key from developer.bestbuy.com. Enables automatic prices on the Wants list; without it Wants still work, they just say why there's no price. |
+| `BESTBUY_API_KEY` | unset | Free key from developer.bestbuy.com. Enables automatic prices on the Wants list; without it, prices can still be typed in by hand and the list says plainly that nothing was checked. |
 | `BESTBUY_API_BASE` | `https://api.bestbuy.com/v1` | Overrides the API host, for testing against a stand-in. |
 
 Set the household timezone in **Setup**. Every day boundary and chore due date

@@ -90,7 +90,10 @@ in with Chromium and copy the cookies across with `secure: false`.
 Shopping prices are testable the same way: `BESTBUY_API_BASE` points the Best
 Buy client at a stand-in, so the whole path — search, bind a SKU, refresh,
 notice a change — runs for real without a key. Test the no-key state too; it
-is the state the app is actually deployed in.
+is the state the app is actually deployed in, and it is the state hand-typed
+Want prices exist for. The handover is worth testing as one run: type a price
+with no key, restart with the stand-in, check, and confirm the typed figure is
+replaced while its history survives.
 
 `src/lib/layout.ts` (event placement) is a pure function and is worth testing
 directly rather than through the UI.
@@ -179,6 +182,21 @@ stale number as though it were current — there is a test for exactly that.
 `BESTBUY_API_BASE` overrides the host so the price path can be tested against
 a stand-in. The first Want, the LG 48" B5 OLED, is seeded once in `db.ts` with
 no SKU on purpose: Best Buy's catalogue decides which product it is.
+
+**A Want's price can also be typed in** (`setWantPrice`), which is what makes
+the list useful before a key exists — and the key may be a while: Best Buy no
+longer issues them to free email addresses, and the owner's .edu application is
+blocked because their verification asks for a US location while he's in Brazil.
+A typed price goes through the same row and the same `price_history`, so the
+up/down arrows work identically, and a later API check simply overwrites the
+current price with the history intact behind it.
+
+`list_items.price_source` is what keeps that honest: `'manual'` when a person
+typed the figure, the retailer otherwise. The Wants list reads it to say "you
+entered this 2d ago" instead of "checked 2d ago" — a number nobody checked must
+never be able to pass for a fresh lookup. `getSpentThisMonth` excludes Wants
+for the same reason: a price you observed on a television is not money spent on
+groceries.
 
 ## Worth a decision
 

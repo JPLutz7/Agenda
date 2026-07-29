@@ -73,7 +73,8 @@ async function refreshWant(item: WantRow): Promise<PriceResult> {
         `UPDATE list_items
          SET retailer_sku = ?, retailer_url = ?, retailer_name = ?,
              price_cents = ?, regular_price_cents = ?,
-             price_checked_at = datetime('now'), price_error = NULL
+             price_checked_at = datetime('now'), price_error = NULL,
+             price_source = ?
          WHERE id = ?`,
       ).run(
         product.sku,
@@ -81,6 +82,7 @@ async function refreshWant(item: WantRow): Promise<PriceResult> {
         product.name,
         product.priceCents,
         product.regularPriceCents,
+        item.retailer ?? "bestbuy",
         item.id,
       );
       recordPrice(item.id, product.priceCents, item.retailer ?? "bestbuy");

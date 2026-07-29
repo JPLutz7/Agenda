@@ -810,6 +810,54 @@ export async function setItemPrice(
   return { ok: "" };
 }
 
+/**
+ * Type in what a Want costs today.
+ *
+ * The retailer lookup is the point of the Wants list, but it needs an API key,
+ * and a key can be weeks away — or refused. Rather than leave the list inert
+ * until then, a price can be entered by hand: same row, same history, same
+ * up-and-down arrows. When a key does arrive, a check overwrites the current
+ * price and everything typed stays in the history behind it.
+ *
+ * `price_source` is what keeps this honest — the app says "you entered this"
+ * rather than "checked just now" for a number nobody checked.
+ */
+export async function setWantPrice(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireSession();
+  const itemId = Number(text(form, "item_id", 20));
+  const cents = priceToCents(text(form, "price", 20));
+  if (!itemId) return { error: "" };
+  if (cents === null) return { error: "That doesn't look like a price." };
+
+  const item = db
+    .prepare<[number], { id: number }>(
+      "SELECT id FROM list_items WHERE id = ? AND category = 'want'",
+    )
+    .get(itemId);
+  if (!item) return { error: "" };
+
+  db.transaction(() => {
+    // regular_price_cents is cleared: a struck-through "was $X" is a claim
+    // about a sale, and a hand-typed figure isn't evidence of one.
+    db.prepare(
+      `UPDATE list_items
+       SET price_cents = ?, regular_price_cents = NULL,
+           price_checked_at = datetime('now'), price_source = 'manual',
+           price_error = NULL
+       WHERE id = ?`,
+    ).run(cents, itemId);
+    db.prepare(
+      "INSERT INTO price_history (item_id, price_cents, source) VALUES (?, ?, 'manual')",
+    ).run(itemId, cents);
+  })();
+
+  refreshViews();
+  return { ok: "" };
+}
+
 /** Check one Want's price now. */
 export async function checkWantPrice(itemId: number): Promise<void> {
   await requireSession();

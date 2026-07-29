@@ -79,6 +79,8 @@ export type ListItem = {
   regular_price_cents: number | null;
   price_checked_at: string | null;
   price_error: string | null;
+  /** 'manual' when a person typed the price in, otherwise the retailer. */
+  price_source: string | null;
   /** The price before the current one, so a change can be shown. */
   previous_price_cents: number | null;
 };
@@ -502,7 +504,7 @@ export function getListItems(): { open: ListItem[]; done: ListItem[] } {
               l.last_price_cents, l.last_price_at,
               l.retailer, l.retailer_sku, l.retailer_url, l.retailer_name,
               l.price_cents, l.regular_price_cents, l.price_checked_at,
-              l.price_error,
+              l.price_error, l.price_source,
               p.name AS added_by_name, p.color AS added_by_color,
               (SELECT h.price_cents FROM price_history h
                 WHERE h.item_id = l.id
@@ -538,14 +540,20 @@ export function getNeedsEstimate(): { totalCents: number; unpriced: number } {
   return { totalCents: row.total ?? 0, unpriced: row.unpriced ?? 0 };
 }
 
-/** What's actually been spent on Needs so far this month. */
+/**
+ * What's actually been spent on Needs so far this month.
+ *
+ * Needs only. A price typed against a Want is an observation — what the
+ * television costs today — not money that left the account, and counting it
+ * as groceries would make the figure nonsense.
+ */
 export function getSpentThisMonth(): number {
   const row = db
     .prepare<[], { total: number | null }>(
       `SELECT SUM(h.price_cents) AS total
        FROM price_history h
        JOIN list_items l ON l.id = h.item_id
-       WHERE h.source = 'manual'
+       WHERE h.source = 'manual' AND l.category = 'need'
          AND strftime('%Y-%m', h.recorded_at) = strftime('%Y-%m', 'now')`,
     )
     .get()!;
