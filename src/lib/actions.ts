@@ -37,7 +37,11 @@ import {
   type StoredAccount,
 } from "./caldav";
 import { canStoreSecrets, encryptSecret } from "./secrets";
-import { refreshOneWant, refreshWantPrices } from "./prices";
+import {
+  refreshOneWant,
+  refreshPricesIfStale,
+  refreshWantPrices,
+} from "./prices";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -55,6 +59,32 @@ function refreshViews() {
   for (const path of ["/", "/calendar", "/chores", "/list", "/settings"]) {
     revalidatePath(path);
   }
+}
+
+/**
+ * Pull everything now, for the refresh button in the page header.
+ *
+ * Deliberately not `refreshIfStale`: that one returns immediately if the last
+ * pull was under ten minutes ago, which is right for a page load and wrong for
+ * a button. Someone tapping refresh is asking a question the ten-minute rule
+ * can't answer — they've just added something on their phone's Calendar and
+ * want to see it here.
+ *
+ * Awaited, unlike the background refresh, so the icon stops spinning when the
+ * data has actually arrived rather than when the request was sent.
+ */
+export async function syncNow(): Promise<void> {
+  await requireSession();
+  try {
+    await syncAllFeeds();
+  } catch {
+    // Nothing to undo — a feed is rebuilt inside a transaction, so a failed
+    // pull leaves the last good copy in place. The page still revalidates:
+    // household events and chores are local and are current regardless, and
+    // Setup lists each source's own error.
+  }
+  refreshPricesIfStale();
+  refreshViews();
 }
 
 /* ------------------------------------------------------------------ setup */

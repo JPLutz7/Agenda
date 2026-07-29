@@ -147,6 +147,12 @@ A refresh will not fire while you're typing in a field — otherwise the form
 would re-render out from under the keyboard mid-word. It catches up as soon as
 the field loses focus.
 
+There's also a refresh button in the top right of every page. It's not the same
+as the automatic refresh: that one only re-pulls iCloud if the last pull was
+more than ten minutes ago, whereas the button pulls immediately. An installed
+home-screen app has no browser reload of its own, and "I just added it on my
+phone, where is it" deserves an answer better than waiting.
+
 The cost of skipping the service worker is that the app needs a connection; it
 won't open on the subway. That's the right trade for something whose entire job
 is telling you what's true right now.
