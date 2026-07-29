@@ -3,6 +3,7 @@
 import {
   useEffect,
   useRef,
+  useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { blockGeometry, placeEvents } from "@/lib/layout";
@@ -27,6 +28,8 @@ const DAY_HEIGHT = HOUR_HEIGHT * 24;
 const AXIS_WIDTH = 44;
 /** Enough for "7 PM" above a few words of title. */
 const MIN_COLUMN = 116;
+/** The "+2 more" chip. Short enough to sit below the titles it crosses. */
+const CHIP_HEIGHT = 14;
 /** Below this a block can't fit two lines, so time and title share one. */
 const TWO_LINE_HEIGHT = 34;
 /** New events land on a quarter hour rather than 10:23. */
@@ -86,6 +89,9 @@ export function TimeGrid({
   const scroller = useRef<HTMLDivElement>(null);
   const single = days.length === 1;
 
+  /** The crowd behind a tapped "+2 more" chip. */
+  const [more, setMore] = useState<CalEvent[] | null>(null);
+
   /**
    * The week used to carry a blank spacer after the last day so every column
    * could reach a start-aligned snap point. It worked, but it meant scrolling
@@ -115,6 +121,8 @@ export function TimeGrid({
       top: Math.max(0, (earliest / 60) * HOUR_HEIGHT - HOUR_HEIGHT),
       left: single ? 0 : Math.max(0, selected * MIN_COLUMN - MIN_COLUMN),
     });
+    // Paging to another week leaves the list holding last week's events.
+    setMore(null);
     // Only when the period changes — not on every tap, which would yank the
     // grid sideways under the user's finger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +162,7 @@ export function TimeGrid({
   };
 
   return (
+    <>
     <div
       ref={scroller}
       // Snapping to column starts means a day is never left half-scrolled
@@ -289,7 +298,9 @@ export function TimeGrid({
               Safari against 812 in Chrome, and anything positioned against
               it inherited the mistake. */}
           {days.map((day, index) => {
-            const placed = placeEvents(day.events.filter((e) => !e.allDay));
+            const { placed, overflow } = placeEvents(
+              day.events.filter((e) => !e.allDay),
+            );
             return (
               <div
                 key={day.day}
@@ -349,6 +360,32 @@ export function TimeGrid({
                   );
                 })}
 
+                {/* What a fourth overlapping event turns into. Anchored to the
+                    bottom of the crowd and hanging upwards, so it crosses the
+                    empty tail of the blocks beside it rather than their
+                    titles. z-10 keeps it above every block (which top out at
+                    z-3) and below the now line (z-20). */}
+                {overflow.map((group) => (
+                  <button
+                    key={group.key}
+                    type="button"
+                    onClick={() => setMore(group.events)}
+                    title={group.events.map((e) => e.summary).join(", ")}
+                    aria-label={`Show ${group.events.length} more event${
+                      group.events.length === 1 ? "" : "s"
+                    }`}
+                    className="absolute left-0 right-0.5 z-10 truncate rounded border border-border bg-surface text-center text-[9px] font-semibold text-muted shadow-sm hover:text-foreground"
+                    style={{
+                      top: `${group.at * 100}%`,
+                      height: CHIP_HEIGHT,
+                      lineHeight: `${CHIP_HEIGHT - 2}px`,
+                      marginTop: -CHIP_HEIGHT,
+                    }}
+                  >
+                    +{group.events.length} more
+                  </button>
+                ))}
+
                 {day.isToday && nowMinutes !== null && (
                   <div
                     className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
@@ -363,5 +400,101 @@ export function TimeGrid({
         </div>
       </div>
     </div>
+
+    <MoreEventsDialog
+      events={more}
+      onPick={(event) => {
+        setMore(null);
+        onOpenEvent(event);
+      }}
+      onClose={() => setMore(null)}
+    />
+    </>
+  );
+}
+
+/**
+ * The events a "+2 more" chip is standing in for.
+ *
+ * A crowded stretch of the week can only ever be summarised on the grid
+ * itself, so the chip has to lead somewhere that says which events they are —
+ * at their full titles, with their times, in the same colours. Picking one
+ * closes this and opens the ordinary event detail, so nothing about a hidden
+ * event is second-class once you've found it.
+ */
+function MoreEventsDialog({
+  events,
+  onPick,
+  onClose,
+}: {
+  events: CalEvent[] | null;
+  onPick: (event: CalEvent) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (events && !dialog.open) dialog.showModal();
+    if (!events && dialog.open) dialog.close();
+  }, [events]);
+
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) onClose();
+      }}
+      // m-auto centres it: the Tailwind reset zeroes the margin a <dialog>
+      // would otherwise use to centre itself, pinning it to the top.
+      className="m-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/40"
+    >
+      {events && (
+        <div className="p-5">
+          <h2 className="text-base font-semibold leading-snug">
+            Also at this time
+          </h2>
+          <p className="mt-1 text-xs text-muted">{events[0].dateLabel}</p>
+
+          <ul className="mt-4 space-y-1">
+            {events.map((event) => (
+              <li key={event.key}>
+                <button
+                  type="button"
+                  onClick={() => onPick(event)}
+                  className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-surface-muted px-3 py-2 text-left hover:border-muted"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: event.color }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {event.summary}
+                    </span>
+                    <span className="block truncate text-xs text-muted">
+                      {event.rangeLabel}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-5 text-right">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-border bg-surface-muted px-4 py-2 text-sm font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </dialog>
   );
 }

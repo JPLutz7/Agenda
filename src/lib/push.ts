@@ -2,7 +2,7 @@ import "server-only";
 import webpush, { type PushSubscription } from "web-push";
 import { db, getSetting, setSetting } from "./db";
 import { assigneeFor, getPeople, timezone } from "./data";
-import { today } from "./dates";
+import { minutesIntoDay, today } from "./dates";
 
 /**
  * Notifications on both phones.
@@ -193,10 +193,10 @@ export function getDevices(): DeviceRow[] {
  * whatever happens to touch the app, so without the marker every page load
  * would fire another buzz.
  *
- * The honest limitation: with nothing scheduled server-side, this only fires
- * when *something* pokes the app. Opening it counts, and so does the
- * `/api/refresh` endpoint, which is what an external cron is for. A phone that
- * nobody opens all day gets told nothing.
+ * Something has to poke this: opening the app counts, `/api/refresh` counts,
+ * and so does the server's own background loop — see
+ * `notifyChoresDueThisMorning`, which is what makes the reminder arrive without
+ * anybody doing anything.
  */
 export async function notifyChoresDue(): Promise<number> {
   const tz = timezone();
@@ -242,6 +242,38 @@ export async function notifyChoresDue(): Promise<number> {
       : await notifyEveryone(notice);
   }
   return sent;
+}
+
+/**
+ * The morning window, in household-local hours, that the server's own loop is
+ * allowed to send chore reminders in.
+ *
+ * Both ends matter. Without a floor the reminder goes out on the first tick
+ * after local midnight, which is a buzz at 12:05am about a chore for a day that
+ * has barely started. Without a ceiling a process that restarts late — a deploy
+ * at 11pm — would fire the whole day's reminders on the way up, when the day is
+ * over and nothing can be done about the bins anyway. Outside the window it
+ * sends nothing *and marks nothing*, so a chore skipped tonight is still
+ * waiting to be announced at 8am tomorrow.
+ */
+const REMINDER_FROM_HOUR = 8;
+const REMINDER_UNTIL_HOUR = 21;
+
+/**
+ * Chore reminders, sent on the server's own schedule rather than because
+ * somebody opened the app.
+ *
+ * Called from the background loop in `instrumentation.ts`, which ticks every
+ * ten minutes, so the notification lands between 8:00 and 8:10 household time.
+ * The per-chore-per-day marker inside `notifyChoresDue` is what keeps the other
+ * 77 ticks of the day silent — this function deliberately holds no state of its
+ * own.
+ */
+export async function notifyChoresDueThisMorning(): Promise<number> {
+  const tz = timezone();
+  const hour = minutesIntoDay(new Date().toISOString(), tz) / 60;
+  if (hour < REMINDER_FROM_HOUR || hour >= REMINDER_UNTIL_HOUR) return 0;
+  return notifyChoresDue();
 }
 
 let inFlight: Promise<unknown> | null = null;

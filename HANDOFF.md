@@ -116,9 +116,21 @@ two-sided check caught them.
 ## Where things stand
 
 Working and deployed: merged calendars, two-way iCloud sync, day/week/month/
-year views with an event detail dialog, chores with rotation, shopping list,
-home-screen install with live refresh, and a per-event destination calendar on
-the add form.
+year views with an event detail dialog, chores with rotation, shopping list with
+Needs and Wants, per-item price sources, editing for events/chores/list items,
+per-item ownership, a refresh button on every page, home-screen install with live
+refresh, and web push notifications.
+
+**Two things are waiting on the owner, not on code:**
+
+1. `BESTBUY_API_KEY` is still unset on Fly, so Best Buy lookups do nothing. The
+   .edu application is blocked while he's in Brazil (their verification wants a
+   US location); the plan is to retry from campus in August. Link-priced and
+   hand-typed Wants work regardless.
+2. Chore reminders are only as reliable as whatever pokes the app. Nothing
+   schedules `/api/refresh` yet. A free cron service hitting it each morning with
+   the `AGENDA_CRON_SECRET` bearer token is all it needs — worth offering, since
+   `AGENDA_CRON_SECRET` isn't set either.
 
 **Picking the calendar per event.** The add form carries a `calendar_id`
 select, built from `getWritableCalendars()` and pre-selected with the
@@ -346,6 +358,25 @@ Want prices, and notifications.
 who-owes-whom from the prices and owner tags already recorded; Google Calendar
 as a second source for his `@nd.edu` class schedule; weather on the Today
 screen; Notre Dame's academic calendar as a feed if they publish one.
+
+**Ideas already discussed with the owner and not built.** He asked what would
+make the app better and picked notifications first; these were the rest, in the
+order they were ranked:
+
+- **Who owes whom.** The pieces are already there — `price_history` knows what
+  things cost, `list_items.added_by` knows whose they were — so a monthly split
+  is arithmetic on data the app holds, with nothing new to sign up for. This is
+  the obvious next feature.
+- **Google Calendar as a second source**, for his `@nd.edu` class schedule. Notre
+  Dame runs on Google. Free but needs an OAuth client registered, which is the
+  one step he'd have to do himself.
+- **Weather on Today** (Open-Meteo, free, no key) and **Notre Dame's academic
+  calendar** if they publish an `.ics`.
+
+He also asked about building this in Lovable. Answered no for this repo: Lovable
+starts projects rather than adopting them, and its shape (Vite SPA + Supabase) has
+nowhere to put the CalDAV sync or the SQLite file. Suggested using it as a design
+sketchpad and bringing screenshots back here.
 
 ## Worth a decision
 
