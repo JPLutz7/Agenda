@@ -16,8 +16,9 @@ to be a product.
   person — landlord visits, rent, a party — added in the app.
 - **Chores that rotate.** Set a chore and a cadence. Marking it done passes the
   turn to the other person and records who did it last.
-- **Notifications.** A chore on the day it's yours, a price drop worth knowing
-  about, and anything your roommate adds to the list.
+- **Notifications.** A chore on the day it's yours, what's on the apartment
+  calendar today, a price drop worth knowing about, and anything your roommate
+  adds to the list or puts on the apartment calendar.
 - **A shopping list.** Anyone adds, anyone ticks off. Each thing on it belongs
   to the apartment or to one person, colour-coded the same way the calendar is,
   and that can be changed later — the washing-up liquid is everyone's, the
@@ -120,17 +121,35 @@ added to the Home Screen first — iOS grants push only to installed web apps,
 and the panel says so rather than failing mysteriously.
 
 You're asked whose phone it is, because there's one shared passcode: it's the
-only way a chore reminder can reach whoever's turn it actually is.
+only way a chore reminder can reach whoever's turn it actually is, and the only
+way "your roommate added this" can avoid being sent to the roommate who added it.
+
+What arrives:
+
+- **Chores due today**, to whoever's turn it is. Once per chore per day.
+- **The apartment calendar's events for today**, to both phones. "The
+  apartment's" means anything with nobody's name on it — added in this app, or
+  in an iCloud calendar Setup leaves unassigned. Personal events are never
+  announced to the flat.
+- **Apartment events added, moved or cancelled**, to whoever didn't do it.
+- **A price drop of $5 or more** on the Wants list. Never a rise.
+- **Anything added to the shopping list**, to the other person.
+
+The day's reminders go out shortly after 8:00 household time, from the server's
+own background loop — no external scheduler needed. The loop ticks every ten
+minutes and only sends between 8:00 and 21:00: without a floor a restart just
+after midnight would buzz about a day that has barely started, and without a
+ceiling a late-evening deploy would fire the whole day's reminders on the way up,
+when nothing can be done about the bins anyway.
 
 Nothing to configure and no keys to obtain — the app generates its own signing
 keys on first use and keeps them in the database.
 
 ### Keeping feeds warm
 
-Optional for calendars, and the thing that makes chore reminders reliable. The
-app sends a reminder when someone opens it, which is exactly the moment they'd
-have seen the chore anyway; a scheduler hitting this once each morning is what
-makes the notification arrive on its own.
+Entirely optional. The server has its own background loop that syncs calendars
+and sends the day's reminders, so nothing external is required. This endpoint
+does the same work for anyone who'd rather drive it from outside.
 
 ```bash
 curl -H "Authorization: Bearer $AGENDA_CRON_SECRET" https://your-host/api/refresh

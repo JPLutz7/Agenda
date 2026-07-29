@@ -222,8 +222,21 @@ something" from "you added something". Without the cookie the list notification
 is skipped rather than guessed at — buzzing you about your own shopping is worse
 than silence.
 
-What fires: a chore due today (once per chore per day, marked in `settings`), a
-price drop of $5 or more (never a rise), and a list addition. Chore reminders
+What fires: a chore due today (once per chore per day, marked in `settings`),
+**the apartment calendar's events for today** (both phones), **an apartment event
+added / moved / cancelled** (the other phone), a price drop of $5 or more (never
+a rise), and a list addition.
+
+**"The apartment's" events** are the ones with nobody's name on them:
+`personName === null` in `getEvents`, which covers both `household_events` and
+any iCloud calendar Setup leaves unassigned — the shared "Dorm" calendar. A
+personal event is never announced to the flat, and there is a test for exactly
+that (two events due today, only one announced, so two sends rather than four).
+
+**The reminder marker is keyed by what the event *is*, not by its row id** — a
+sha1 of summary + start + all-day. Feed rows live in the `events` cache, which is
+deleted and rebuilt on every sync, so their ids change underneath us; keying on
+one would re-announce the same event after each refresh. Chore reminders
 run from `notifyChoresDueInBackground()` on the Today and Chores pages **and**
 from `/api/refresh`. The honest limitation is in that first path: opening the app
 is the moment you'd have seen the chore anyway, so a scheduler pointed at

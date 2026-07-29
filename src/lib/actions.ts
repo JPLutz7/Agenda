@@ -22,7 +22,13 @@ import {
   timezone,
 } from "./data";
 import { PERSON_PALETTE } from "./colors";
-import { addDays, today } from "./dates";
+import {
+  addDays,
+  eventDayKey,
+  formatDayLabel,
+  formatTime,
+  today,
+} from "./dates";
 import { normalizeFeedUrl } from "./ics";
 import {
   syncAllFeeds,
@@ -665,6 +671,7 @@ export async function addHouseholdEvent(
     remote?.etag ?? null,
   );
 
+  await announceApartmentEvent("added", title, startsAt, allDay);
   refreshViews();
   return {
     ok: writeCalendar
@@ -826,6 +833,7 @@ export async function updateHouseholdEvent(
     eventId,
   );
 
+  await announceApartmentEvent("moved", title, startsAt, allDay);
   refreshViews();
   if (strandedCopy) {
     return {
@@ -886,13 +894,17 @@ export async function removeHouseholdEvent(eventId: number): Promise<void> {
     .prepare<
       [number],
       {
+        title: string;
+        starts_at: string;
+        all_day: number;
         caldav_calendar_id: number | null;
         caldav_url: string | null;
         caldav_uid: string | null;
         caldav_etag: string | null;
       }
     >(
-      `SELECT caldav_calendar_id, caldav_url, caldav_uid, caldav_etag
+      `SELECT title, starts_at, all_day,
+              caldav_calendar_id, caldav_url, caldav_uid, caldav_etag
        FROM household_events WHERE id = ?`,
     )
     .get(eventId);
@@ -919,6 +931,12 @@ export async function removeHouseholdEvent(eventId: number): Promise<void> {
 
   db.prepare("DELETE FROM household_events WHERE id = ?").run(eventId);
   forgetCachedEvent(event.caldav_uid);
+  await announceApartmentEvent(
+    "cancelled",
+    event.title,
+    event.starts_at,
+    event.all_day === 1,
+  );
   refreshViews();
 }
 
@@ -1200,6 +1218,46 @@ export async function addListItem(
     return { ok: `Added "${label}". ${result.error}` };
   }
   return { ok: `Added "${label}".` };
+}
+
+/**
+ * Tell the *other* phone that the apartment calendar changed.
+ *
+ * The apartment calendar is the one thing in here that is nobody's and both
+ * people's, so a landlord visit appearing — or moving, or being called off — is
+ * news to whoever didn't do it. Same rule as the shopping list: the adder comes
+ * from the device cookie, and a phone that never turned notifications on stays
+ * silent rather than being told about its own typing.
+ */
+async function announceApartmentEvent(
+  verb: "added" | "moved" | "cancelled",
+  title: string,
+  startsAt: string,
+  allDay: boolean,
+): Promise<void> {
+  const actor = await devicePerson();
+  if (actor === null) return;
+  const name = getPeople().find((p) => p.id === actor)?.name;
+  const tz = timezone();
+  const day = eventDayKey(startsAt, allDay, tz);
+  const when = allDay
+    ? `${formatDayLabel(day, tz)}, all day`
+    : `${formatDayLabel(day, tz)} at ${formatTime(startsAt, tz)}`;
+
+  await notifyOthers(actor, {
+    title:
+      verb === "cancelled"
+        ? `Off the apartment calendar: ${title}`
+        : `${title} — ${when}`,
+    body:
+      verb === "cancelled"
+        ? `${name ?? "Someone"} removed it.`
+        : `${name ?? "Someone"} ${verb} it on the apartment calendar.`,
+    url: "/calendar?view=day&date=" + day,
+    // Keyed to the event so a title typed, then corrected, replaces itself
+    // rather than arriving twice.
+    tag: `apt-event-${title.toLowerCase().replace(/\W+/g, "-").slice(0, 40)}`,
+  }).catch(() => undefined);
 }
 
 /**

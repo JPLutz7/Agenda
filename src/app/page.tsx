@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireSignedIn } from "@/lib/guard";
 import { getDashboard } from "@/lib/data";
 import { refreshIfStale } from "@/lib/sync";
-import { notifyChoresDueInBackground } from "@/lib/push";
+import { notifyTodayInBackground } from "@/lib/push";
 import { addDays, formatDayLabel } from "@/lib/dates";
 import { DaySection } from "@/components/event-list";
 import { AddHouseholdEventForm } from "@/components/add-event-form";
@@ -17,8 +17,8 @@ export default async function HomePage() {
   // awaited — a slow feed shouldn't hold up the page.
   refreshIfStale();
   // Without a scheduler pointed at /api/refresh, opening the app is what
-  // makes a chore reminder go out. Not awaited.
-  notifyChoresDueInBackground();
+  // makes today's reminders go out. Not awaited.
+  notifyTodayInBackground();
 
   const {
     days,

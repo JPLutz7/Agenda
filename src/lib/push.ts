@@ -1,8 +1,9 @@
 import "server-only";
+import crypto from "node:crypto";
 import webpush, { type PushSubscription } from "web-push";
 import { db, getSetting, setSetting } from "./db";
-import { assigneeFor, getPeople, timezone } from "./data";
-import { minutesIntoDay, today } from "./dates";
+import { assigneeFor, getEvents, getPeople, timezone } from "./data";
+import { formatTime, minutesIntoDay, today } from "./dates";
 
 /**
  * Notifications on both phones.
@@ -194,9 +195,8 @@ export function getDevices(): DeviceRow[] {
  * would fire another buzz.
  *
  * Something has to poke this: opening the app counts, `/api/refresh` counts,
- * and so does the server's own background loop — see
- * `notifyChoresDueThisMorning`, which is what makes the reminder arrive without
- * anybody doing anything.
+ * and so does the server's own background loop — see `notifyDueThisMorning`,
+ * which is what makes the reminder arrive without anybody doing anything.
  */
 export async function notifyChoresDue(): Promise<number> {
   const tz = timezone();
@@ -246,7 +246,7 @@ export async function notifyChoresDue(): Promise<number> {
 
 /**
  * The morning window, in household-local hours, that the server's own loop is
- * allowed to send chore reminders in.
+ * allowed to send the day's reminders in.
  *
  * Both ends matter. Without a floor the reminder goes out on the first tick
  * after local midnight, which is a buzz at 12:05am about a chore for a day that
@@ -260,34 +260,88 @@ const REMINDER_FROM_HOUR = 8;
 const REMINDER_UNTIL_HOUR = 21;
 
 /**
- * Chore reminders, sent on the server's own schedule rather than because
- * somebody opened the app.
+ * The day's reminders, sent on the server's own schedule rather than because
+ * somebody opened the app: chores that are due, and what's on the apartment
+ * calendar.
  *
  * Called from the background loop in `instrumentation.ts`, which ticks every
- * ten minutes, so the notification lands between 8:00 and 8:10 household time.
- * The per-chore-per-day marker inside `notifyChoresDue` is what keeps the other
+ * ten minutes, so the notifications land between 8:00 and 8:10 household time.
+ * The per-item-per-day markers inside the two functions are what keep the other
  * 77 ticks of the day silent — this function deliberately holds no state of its
  * own.
  */
-export async function notifyChoresDueThisMorning(): Promise<number> {
+export async function notifyDueThisMorning(): Promise<number> {
   const tz = timezone();
   const hour = minutesIntoDay(new Date().toISOString(), tz) / 60;
   if (hour < REMINDER_FROM_HOUR || hour >= REMINDER_UNTIL_HOUR) return 0;
-  return notifyChoresDue();
+  const [chores, events] = await Promise.all([
+    notifyChoresDue(),
+    notifyApartmentEventsToday(),
+  ]);
+  return chores + events;
+}
+
+/**
+ * What's on the apartment calendar today.
+ *
+ * The flat's own events, told to both phones — a landlord visit or the rent
+ * going out isn't one person's business, which is what makes it an apartment
+ * event rather than someone's.
+ *
+ * "The apartment's" means any event with nobody's name on it: the ones added in
+ * this app, and anything in an iCloud calendar that Setup leaves unassigned —
+ * the shared "Dorm" calendar, typically. Both read as the flat's in every other
+ * screen, so both belong here.
+ *
+ * The marker is keyed by what the event *is*, not by its row id. Feed rows are
+ * a cache that gets deleted and rebuilt on every sync, so their ids change
+ * underneath us — keying on one would send the same reminder again after a
+ * refresh.
+ */
+export async function notifyApartmentEventsToday(): Promise<number> {
+  const tz = timezone();
+  const day = today(tz);
+
+  const events = getEvents(day, day).filter(
+    // Chores are handled separately and would otherwise arrive twice.
+    (event) => event.personName === null && event.source !== "chore",
+  );
+
+  let sent = 0;
+  for (const event of events) {
+    const identity = crypto
+      .createHash("sha1")
+      .update(`${event.summary}|${event.startsAt}|${event.allDay}`)
+      .digest("hex")
+      .slice(0, 12);
+    const marker = `event_notified_${identity}`;
+    if (getSetting(marker) === day) continue;
+    setSetting(marker, day);
+
+    sent += await notifyEveryone({
+      title: event.summary,
+      body: event.allDay
+        ? "On the apartment calendar today."
+        : `Today at ${formatTime(event.startsAt, tz)}.`,
+      url: "/",
+      tag: `event-${identity}`,
+    });
+  }
+  return sent;
 }
 
 let inFlight: Promise<unknown> | null = null;
 
 /**
- * The same thing, safe to call from a page render.
+ * Everything today ought to have told you, safe to call from a page render.
  *
  * Not awaited — a slow push service must not hold up the page — and guarded so
- * two simultaneous loads don't both get as far as sending. The per-day marker
- * makes the common case a single cheap query.
+ * two simultaneous loads don't both get as far as sending. The per-day markers
+ * make the common case a couple of cheap queries.
  */
-export function notifyChoresDueInBackground(): void {
+export function notifyTodayInBackground(): void {
   if (inFlight) return;
-  inFlight = notifyChoresDue()
+  inFlight = Promise.all([notifyChoresDue(), notifyApartmentEventsToday()])
     .catch(() => undefined)
     .finally(() => {
       inFlight = null;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isSignedIn } from "@/lib/auth";
 import { syncAllFeeds } from "@/lib/sync";
 import { refreshWantPrices } from "@/lib/prices";
-import { notifyChoresDue } from "@/lib/push";
+import { notifyApartmentEventsToday, notifyChoresDue } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +33,14 @@ async function handle(request: Request) {
   // shouldn't mean nobody hears about the bins.
   const prices = await refreshWantPrices({ onlyStale: true }).catch(() => []);
   const notified = await notifyChoresDue().catch(() => 0);
+  const events = await notifyApartmentEventsToday().catch(() => 0);
 
   return NextResponse.json({
     synced: results.length,
     imported: results.reduce((sum, r) => sum + r.imported, 0),
     pricesChecked: prices.length,
     choreRemindersSent: notified,
+    eventRemindersSent: events,
     errors: results.filter((r) => r.error).map((r) => ({
       feed: r.label,
       error: r.error,

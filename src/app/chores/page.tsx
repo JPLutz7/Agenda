@@ -1,6 +1,6 @@
 import { requireSignedIn } from "@/lib/guard";
 import { getChores, getPeople, timezone } from "@/lib/data";
-import { notifyChoresDueInBackground } from "@/lib/push";
+import { notifyTodayInBackground } from "@/lib/push";
 import { addChore, updateChore } from "@/lib/actions";
 import { today } from "@/lib/dates";
 import {
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ChoresPage() {
   await requireSignedIn();
-  notifyChoresDueInBackground();
+  notifyTodayInBackground();
   const chores = getChores();
   const people = getPeople();
   const tz = timezone();

@@ -1,5 +1,5 @@
 /**
- * Background sync, and the morning chore reminder.
+ * Background sync, and the morning reminders.
  *
  * Next.js calls register() once when the server process starts. Because this
  * deployment runs a machine that's always on, we can keep a plain interval
@@ -8,10 +8,11 @@
  * Two things ride on it. Calendars, so iCloud data is already current when
  * someone opens the app rather than the first page load waiting on a fetch to
  * Apple — the on-demand refresh in lib/sync.ts stays as a safety net for the
- * case where this process has only just started. And chore reminders, which
- * are the reason this loop exists at all rather than an external cron: a
- * reminder that only fires when somebody opens the app arrives at the exact
- * moment they'd have seen the chore anyway.
+ * case where this process has only just started. And the day's reminders —
+ * chores that are due and what's on the apartment calendar — which are the
+ * reason this loop exists at all rather than an external cron: a reminder that
+ * only fires when somebody opens the app arrives at the exact moment they'd
+ * have seen the thing anyway.
  *
  * `/api/refresh` still does the same work for an external scheduler. Nothing
  * here replaces it; it's just no longer the only way the reminder can happen.
@@ -29,17 +30,17 @@ export async function register() {
   // a build or edge bundle.
   const { syncAllFeeds } = await import("./lib/sync");
   const { refreshWantPrices } = await import("./lib/prices");
-  const { notifyChoresDueThisMorning } = await import("./lib/push");
+  const { notifyDueThisMorning } = await import("./lib/push");
 
   const run = async () => {
     try {
       // Reminders go first, and can't be held up by a slow fetch to Apple:
       // whether the bins are yours today is already known locally.
-      const sent = await notifyChoresDueThisMorning().catch((err) => {
-        console.error("[agenda] chore reminders failed", err);
+      const sent = await notifyDueThisMorning().catch((err) => {
+        console.error("[agenda] reminders failed", err);
         return 0;
       });
-      if (sent > 0) console.log(`[agenda] sent ${sent} chore reminder(s)`);
+      if (sent > 0) console.log(`[agenda] sent ${sent} reminder(s)`);
 
       // Want prices ride along with the calendar sync; they only move on the
       // retailer's schedule, and the stale check inside keeps it cheap.
