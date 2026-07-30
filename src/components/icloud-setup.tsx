@@ -3,6 +3,7 @@ import {
   disconnectICloudAccount,
   setAccountPerson,
   setCalendarEnabled,
+  setCalendarPerson,
   setWriteCalendar,
 } from "@/lib/actions";
 import type { CalDavAccountView, Person } from "@/lib/data";
@@ -129,42 +130,94 @@ export function ICloudSetup({
                 </form>
               </div>
 
+              {/* Each calendar takes two rows, not one. The name and the Hide
+                  button share the first; the owner picker gets the second to
+                  itself, because a select wide enough to read "Same as the
+                  account (Joao)" and a button beside it do not both fit next to
+                  Hide on a phone — they ended up on top of each other. */}
               <ul className="divide-y divide-border">
                 {account.calendars.map((calendar) => (
-                  <li
-                    key={calendar.id}
-                    className="flex items-center gap-3 px-4 py-2.5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">
-                        {calendar.display_name}
-                        {calendar.read_only ? (
-                          <span className="ml-2 text-xs text-muted">
-                            read-only
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted">
-                        {calendar.enabled
-                          ? `${calendar.event_count} events`
-                          : "not shown"}
-                      </p>
-                      {calendar.last_error && (
-                        <p className="mt-1 text-xs text-red-500">
-                          {calendar.last_error}
-                        </p>
-                      )}
-                    </div>
-                    <form action={setCalendarEnabled.bind(null, calendar.id)}>
-                      <input
-                        type="hidden"
-                        name="enabled"
-                        value={calendar.enabled ? "0" : "1"}
+                  <li key={calendar.id} className="px-4 py-2.5">
+                    <div className="flex items-start gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor:
+                            calendar.owner_color ?? HOUSEHOLD_COLOR,
+                        }}
                       />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">
+                          {calendar.display_name}
+                          {calendar.read_only ? (
+                            <span className="ml-2 text-xs text-muted">
+                              read-only
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted">
+                          {calendar.owner_name ?? "Apartment"} ·{" "}
+                          {calendar.enabled
+                            ? `${calendar.event_count} event${
+                                calendar.event_count === 1 ? "" : "s"
+                              }`
+                            : "not shown"}
+                        </p>
+                      </div>
+                      <form action={setCalendarEnabled.bind(null, calendar.id)}>
+                        <input
+                          type="hidden"
+                          name="enabled"
+                          value={calendar.enabled ? "0" : "1"}
+                        />
+                        <SubmitButton variant="quiet" size="sm">
+                          {calendar.enabled ? "Hide" : "Show"}
+                        </SubmitButton>
+                      </form>
+                    </div>
+
+                    {/* Not every calendar in one Apple ID belongs to the same
+                        person. A shared "Dorm" is the flat's, and saying so is
+                        what puts it in the apartment's colour and into the
+                        reminders that go to both phones. */}
+                    <form
+                      action={setCalendarPerson.bind(null, calendar.id)}
+                      className="mt-2 flex items-center gap-1.5 pl-5"
+                    >
+                      <select
+                        name="person_id"
+                        defaultValue={
+                          calendar.owner_set
+                            ? (calendar.owner_person_id ?? "household")
+                            : "account"
+                        }
+                        aria-label={`Whose calendar ${calendar.display_name} is`}
+                        className="min-w-0 flex-1 rounded-md border border-border bg-surface px-1.5 py-1 text-xs"
+                      >
+                        <option value="account">
+                          Same as the account
+                          {account.person_name
+                            ? ` (${account.person_name})`
+                            : " (the apartment)"}
+                        </option>
+                        <option value="household">The apartment</option>
+                        {people.map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name}
+                          </option>
+                        ))}
+                      </select>
                       <SubmitButton variant="quiet" size="sm">
-                        {calendar.enabled ? "Hide" : "Show"}
+                        Save
                       </SubmitButton>
                     </form>
+
+                    {calendar.last_error && (
+                      <p className="mt-1 pl-5 text-xs text-red-500">
+                        {calendar.last_error}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

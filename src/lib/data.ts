@@ -232,14 +232,26 @@ export function getEvents(
       }
     >(
       `SELECT e.id, e.summary, e.location, e.starts_at, e.ends_at, e.all_day,
-              COALESCE(pf.name, pa.name)   AS person_name,
-              COALESCE(pf.color, pa.color) AS person_color
+              CASE
+                WHEN e.feed_id IS NOT NULL  THEN pf.name
+                WHEN c.owner_set = 1        THEN po.name
+                ELSE pa.name
+              END AS person_name,
+              CASE
+                WHEN e.feed_id IS NOT NULL  THEN pf.color
+                WHEN c.owner_set = 1        THEN po.color
+                ELSE pa.color
+              END AS person_color
        FROM events e
        LEFT JOIN feeds f            ON f.id  = e.feed_id
        LEFT JOIN people pf          ON pf.id = f.person_id
        LEFT JOIN caldav_calendars c ON c.id  = e.calendar_id
        LEFT JOIN caldav_accounts a  ON a.id  = c.account_id
        LEFT JOIN people pa          ON pa.id = a.person_id
+       -- The calendar's own owner, which beats the account's when it's set.
+       -- Null with owner_set = 1 is the apartment, and reads the same as an
+       -- unassigned feed does: no name, household colour, notified to both.
+       LEFT JOIN people po          ON po.id = c.owner_person_id
        WHERE e.ends_at >= ? AND e.starts_at <= ?
          AND NOT EXISTS (
            SELECT 1 FROM household_events h
@@ -410,6 +422,15 @@ export type CalDavCalendarView = {
   last_synced_at: string | null;
   last_error: string | null;
   event_count: number;
+  /** 0: whoever the account belongs to. 1: the two fields below instead. */
+  owner_set: number;
+  owner_person_id: number | null;
+  /**
+   * Whose this calendar actually reads as, account inheritance resolved. Null
+   * is the apartment — which is the same thing null means everywhere else.
+   */
+  owner_name: string | null;
+  owner_color: string | null;
 };
 
 export type CalDavAccountView = {
@@ -448,8 +469,14 @@ export function getCalDavAccounts(): CalDavAccountView[] {
   const calendarsFor = db.prepare<[number], CalDavCalendarView>(
     `SELECT c.id, c.url, c.display_name, c.read_only, c.enabled,
             c.last_synced_at, c.last_error,
+            c.owner_set, c.owner_person_id,
+            CASE WHEN c.owner_set = 1 THEN po.name  ELSE pa.name  END AS owner_name,
+            CASE WHEN c.owner_set = 1 THEN po.color ELSE pa.color END AS owner_color,
             (SELECT COUNT(*) FROM events e WHERE e.calendar_id = c.id) AS event_count
      FROM caldav_calendars c
+     JOIN caldav_accounts a ON a.id = c.account_id
+     LEFT JOIN people pa ON pa.id = a.person_id
+     LEFT JOIN people po ON po.id = c.owner_person_id
      WHERE c.account_id = ?
      ORDER BY c.display_name`,
   );

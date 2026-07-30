@@ -106,19 +106,20 @@ export function EventModal({
                 </dd>
               </div>
 
-              {event.personName && (
-                <div className="flex gap-3">
-                  <dt className="w-20 shrink-0 text-muted">Whose</dt>
-                  <dd className="flex min-w-0 flex-1 items-center gap-2">
-                    <span
-                      aria-hidden="true"
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: event.color }}
-                    />
-                    {event.personName}
-                  </dd>
-                </div>
-              )}
+              {/* Always shown. No name means the apartment's, and saying so is
+                  more use than leaving the row out and making someone guess
+                  from the colour. */}
+              <div className="flex gap-3">
+                <dt className="w-20 shrink-0 text-muted">Whose</dt>
+                <dd className="flex min-w-0 flex-1 items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: event.color }}
+                  />
+                  {event.personName ?? "The apartment"}
+                </dd>
+              </div>
 
               {event.location && (
                 <div className="flex gap-3">

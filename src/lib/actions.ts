@@ -21,7 +21,7 @@ import {
   getWriteCalendar,
   timezone,
 } from "./data";
-import { PERSON_PALETTE } from "./colors";
+import { PERSON_PALETTE, looksLikeSharedCalendar } from "./colors";
 import {
   addDays,
   eventDayKey,
@@ -415,11 +415,20 @@ export async function connectICloudAccount(
       );
     const id = Number(info.lastInsertRowid);
     const insert = db.prepare(
-      `INSERT INTO caldav_calendars (account_id, url, display_name, read_only, enabled)
-       VALUES (?, ?, ?, ?, 1)`,
+      `INSERT INTO caldav_calendars
+         (account_id, url, display_name, read_only, enabled, owner_set)
+       VALUES (?, ?, ?, ?, 1, ?)`,
     );
     for (const c of discovered) {
-      insert.run(id, c.url, c.displayName, c.readOnly ? 1 : 0);
+      // A calendar named after the flat is the flat's from the start, whoever's
+      // Apple ID it happens to live in. Changeable in Setup afterwards.
+      insert.run(
+        id,
+        c.url,
+        c.displayName,
+        c.readOnly ? 1 : 0,
+        looksLikeSharedCalendar(c.displayName) ? 1 : 0,
+      );
     }
     return id;
   })();
@@ -510,6 +519,66 @@ export async function setAccountPerson(
   db.prepare("UPDATE caldav_accounts SET person_id = ? WHERE id = ?").run(
     personId,
     accountId,
+  );
+  refreshViews();
+}
+
+/**
+ * Whose one calendar is, when that isn't whose the account is.
+ *
+ * One Apple ID holds several calendars and they don't all belong to the same
+ * person. A shared "Dorm" sitting in Joao's account is the flat's, not his: it's
+ * where the rent and the landlord's visits go, and both of you need telling
+ * about those. Before this, everything under an account took the account's
+ * owner, so the shared calendar showed in one person's colour with his name on
+ * it and was left out of the apartment reminders entirely — those go to whatever
+ * has nobody's name on it.
+ *
+ * Three answers, so three values: "account" to follow the account (the
+ * default), "household" for the apartment, or a person's id.
+ */
+export async function setCalendarPerson(
+  calendarId: number,
+  form: FormData,
+): Promise<void> {
+  await requireSession();
+  const raw = text(form, "person_id", 20);
+  if (raw === "account") {
+    db.prepare(
+      `UPDATE caldav_calendars
+       SET owner_set = 0, owner_person_id = NULL WHERE id = ?`,
+    ).run(calendarId);
+    refreshViews();
+    return;
+  }
+  const personId = raw === "" || raw === "household" ? null : Number(raw);
+  if (personId !== null && !Number.isInteger(personId)) return;
+  db.prepare(
+    `UPDATE caldav_calendars
+     SET owner_set = 1, owner_person_id = ? WHERE id = ?`,
+  ).run(personId, calendarId);
+  refreshViews();
+}
+
+/**
+ * The same choice for a published link.
+ *
+ * A feed's owner was settled when it was added and then fixed forever, so a
+ * "Dorm" pasted in as somebody's could only be corrected by deleting it and
+ * starting again. A feed has no account above it, so there are only two answers
+ * here: a person, or the apartment.
+ */
+export async function setFeedPerson(
+  feedId: number,
+  form: FormData,
+): Promise<void> {
+  await requireSession();
+  const raw = text(form, "person_id", 20);
+  const personId = raw === "" || raw === "household" ? null : Number(raw);
+  if (personId !== null && !Number.isInteger(personId)) return;
+  db.prepare("UPDATE feeds SET person_id = ? WHERE id = ?").run(
+    personId,
+    feedId,
   );
   refreshViews();
 }

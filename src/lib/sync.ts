@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { looksLikeSharedCalendar } from "./colors";
 import { expandIcs, fetchIcs } from "./ics";
 import {
   discoverCalendarsForAccount,
@@ -197,9 +198,14 @@ export async function reconcileCalendars(): Promise<void> {
       // everything. Only reconcile when there's something to reconcile.
       if (found.length === 0) continue;
 
+      // owner_set is decided here, on the insert, and deliberately left out of
+      // the DO UPDATE: a calendar called "Dorm" starts out as the apartment's
+      // rather than as whoever owns the Apple ID it sits in, and then whatever
+      // is chosen in Setup stands, however many syncs run afterwards.
       const upsert = db.prepare(
-        `INSERT INTO caldav_calendars (account_id, url, display_name, read_only, enabled)
-         VALUES (?, ?, ?, ?, 1)
+        `INSERT INTO caldav_calendars
+           (account_id, url, display_name, read_only, enabled, owner_set)
+         VALUES (?, ?, ?, ?, 1, ?)
          ON CONFLICT(account_id, url) DO UPDATE SET
            display_name = excluded.display_name,
            read_only    = excluded.read_only`,
@@ -212,7 +218,13 @@ export async function reconcileCalendars(): Promise<void> {
 
       db.transaction(() => {
         for (const c of found) {
-          upsert.run(account.id, c.url, c.displayName, c.readOnly ? 1 : 0);
+          upsert.run(
+            account.id,
+            c.url,
+            c.displayName,
+            c.readOnly ? 1 : 0,
+            looksLikeSharedCalendar(c.displayName) ? 1 : 0,
+          );
         }
         prune.run(account.id, ...found.map((c) => c.url));
         db.prepare(

@@ -31,6 +31,38 @@ export const REQUESTED_COLORS: { match: string; color: string }[] = [
   { match: "joao", color: "#2563eb" }, // blue
 ];
 
+/**
+ * Calendar names that mean "the flat", not "a person".
+ *
+ * The household's shared calendar is called "Dorm" and lives inside one
+ * person's Apple ID, so without this it reads as that person's — wrong colour,
+ * wrong label, and left out of the apartment reminders, which go to whatever
+ * has nobody's name on it. A calendar's URL says nothing about what it's for,
+ * so the name is the only signal there is.
+ *
+ * Used once, when a database is first brought up to this version (see `db.ts`).
+ * The pickers in Setup are the real answer and always win.
+ */
+export const SHARED_CALENDAR_WORDS = [
+  "dorm",
+  "dorms",
+  "apartment",
+  "apt",
+  "flat",
+  "household",
+  "roommate",
+  "roommates",
+];
+
+export function looksLikeSharedCalendar(name: string): boolean {
+  // Whole words, so "Dorm" and "Dorm stuff" match while "Dormitory lectures"
+  // and a person named Aptal don't get swept in.
+  return normalizeName(name)
+    .split(/[^a-z]+/)
+    .filter(Boolean)
+    .some((word) => SHARED_CALENDAR_WORDS.includes(word));
+}
+
 /** Lowercased and stripped of accents, so "João" matches "joao". */
 export function normalizeName(name: string): string {
   return name

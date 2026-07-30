@@ -46,7 +46,14 @@ export function EventRow({
         <p className="mt-0.5 text-xs text-muted">
           {event.allDay ? "All day" : formatTime(event.startsAt, timeZone)}
           {event.personName ? ` · ${event.personName}` : ""}
-          {event.source === "household" ? " · Apartment" : ""}
+          {/* Nobody's name on it means it's the flat's, whichever calendar it
+              came from. This used to say "Apartment" only for events added in
+              the app, so an event from a shared iCloud calendar was labelled
+              with nothing at all — even though it's treated as the
+              apartment's everywhere else, notifications included. */}
+          {event.personName === null && event.source !== "chore"
+            ? " · Apartment"
+            : ""}
           {event.source === "chore" ? " · Chore" : ""}
           {event.location ? ` · ${event.location}` : ""}
         </p>

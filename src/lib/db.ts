@@ -1,7 +1,11 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
-import { REQUESTED_COLORS, normalizeName } from "./colors";
+import {
+  REQUESTED_COLORS,
+  looksLikeSharedCalendar,
+  normalizeName,
+} from "./colors";
 
 /**
  * SQLite lives on disk so the two of us see the same data. In dev that's
@@ -112,6 +116,17 @@ function migrate(db: Database.Database) {
       enabled        INTEGER NOT NULL DEFAULT 1,
       last_synced_at TEXT,
       last_error     TEXT,
+
+      -- Whose this one calendar is, when that differs from whose the account
+      -- is. One Apple ID holds both "Joao" and a shared "Dorm", and only the
+      -- second is the flat's. Two columns because there are three answers and
+      -- a nullable id can only carry two: owner_set = 0 means "same as the
+      -- account", and owner_set = 1 with a null owner_person_id means the
+      -- apartment. Everything downstream keys off the resulting person being
+      -- null, so an override reaches colours, labels and notifications at once.
+      owner_set       INTEGER NOT NULL DEFAULT 0,
+      owner_person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
+
       UNIQUE(account_id, url)
     );
 
@@ -317,8 +332,70 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // A calendar can now be the apartment's even when its account is someone's.
+  // The added owner_person_id carries no REFERENCES clause — SQLite can't add
+  // a foreign key to an existing table — but a dangling id joins to no row and
+  // so reads as the apartment, which is what ON DELETE SET NULL would give.
+  const calendarColumns = columnsOf(db, "caldav_calendars");
+  for (const [name, type] of [
+    ["owner_set", "INTEGER NOT NULL DEFAULT 0"],
+    ["owner_person_id", "INTEGER"],
+  ] as const) {
+    if (calendarColumns.includes(name)) continue;
+    try {
+      db.exec(`ALTER TABLE caldav_calendars ADD COLUMN ${name} ${type}`);
+    } catch (err) {
+      if (!/duplicate column name/i.test(String(err))) throw err;
+    }
+  }
+
   seedFirstWant(db);
   applyRequestedColors(db);
+  claimSharedCalendars(db);
+}
+
+/**
+ * Calendars named after the flat belong to the flat.
+ *
+ * The household's shared calendar is called "Dorm" and it sat inside one
+ * person's Apple ID, so everything on it — the rent, the landlord, the things
+ * both of them need telling about — read as that person's and was left out of
+ * the apartment reminders, which go to whatever has nobody's name on it.
+ *
+ * Names are the only signal available: a calendar's URL says nothing about what
+ * it's for. So this matches on the name once, the same way the requested colours
+ * are applied once, and then never again — the pickers in Setup are the real
+ * answer, and a choice made there must not be undone by the next boot.
+ */
+function claimSharedCalendars(db: Database.Database) {
+  const marker = "shared_calendars_claimed";
+  const done = db
+    .prepare<[string], { value: string }>(
+      "SELECT value FROM settings WHERE key = ?",
+    )
+    .get(marker);
+  if (done) return;
+
+  for (const row of db
+    .prepare<[], { id: number; display_name: string }>(
+      "SELECT id, display_name FROM caldav_calendars",
+    )
+    .all()) {
+    if (!looksLikeSharedCalendar(row.display_name)) continue;
+    db.prepare(
+      `UPDATE caldav_calendars
+       SET owner_set = 1, owner_person_id = NULL WHERE id = ?`,
+    ).run(row.id);
+  }
+
+  for (const row of db
+    .prepare<[], { id: number; label: string }>("SELECT id, label FROM feeds")
+    .all()) {
+    if (!looksLikeSharedCalendar(row.label)) continue;
+    db.prepare("UPDATE feeds SET person_id = NULL WHERE id = ?").run(row.id);
+  }
+
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, '1')").run(marker);
 }
 
 /**

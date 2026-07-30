@@ -18,6 +18,7 @@ import {
   removePerson,
   removePushDevice,
   sendTestNotification,
+  setFeedPerson,
   setTimezone,
   signOut,
   updatePersonColor,
@@ -122,6 +123,30 @@ export default async function SettingsPage({
                     ? ` · synced ${feed.last_synced_at} UTC`
                     : " · never synced"}
                 </p>
+                {/* Chosen when the link was pasted in, and until now stuck
+                    there. A calendar that turns out to be the flat's — a shared
+                    "Dorm" — needed deleting and re-adding to say so. */}
+                <form
+                  action={setFeedPerson.bind(null, feed.id)}
+                  className="mt-1.5 flex items-center gap-1.5"
+                >
+                  <select
+                    name="person_id"
+                    defaultValue={feed.person_id ?? "household"}
+                    aria-label={`Whose calendar ${feed.label} is`}
+                    className="min-w-0 flex-1 rounded-md border border-border bg-surface px-1.5 py-1 text-xs"
+                  >
+                    <option value="household">The apartment</option>
+                    {people.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                  <SubmitButton variant="quiet" size="sm">
+                    Save
+                  </SubmitButton>
+                </form>
                 {feed.last_error && (
                   <p className="mt-1 text-xs text-red-500">{feed.last_error}</p>
                 )}
