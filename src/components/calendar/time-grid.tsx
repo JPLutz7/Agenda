@@ -42,6 +42,37 @@ const TWO_LINE_HEIGHT = 34;
 const SLOT_MINUTES = 15;
 
 /**
+ * How long the grid waits before treating the next wheel event as a new
+ * gesture. A trackpad fires every few milliseconds while a finger is down and
+ * keeps firing through the momentum afterwards, so this only has to be longer
+ * than that stream's own gaps and shorter than a pause a person would notice.
+ */
+const GESTURE_GAP_MS = 180;
+/**
+ * How hard you have to push sideways before the grid accepts that you meant it.
+ * Roughly a deliberate flick; the few pixels that ride along with a vertical
+ * scroll are nowhere near.
+ */
+const SIDEWAYS_FLOOR = 18;
+/**
+ * How far sideways one gesture takes you: exactly one day, however hard it was
+ * thrown.
+ *
+ * Damping the movement instead — scrolling by some fraction of the delta — does
+ * not work here, and the reason is worth writing down. The grid is
+ * `scroll-snap-type: x mandatory`, and a *programmatic* scroll gets snapped the
+ * moment it's made. So each damped nudge lands short of the next column, is
+ * pulled straight back to the one it started on, and forty of them in a row add
+ * up to nothing at all. Native wheel scrolling escapes this because the browser
+ * treats the whole gesture as one scroll and snaps once at the end.
+ *
+ * One column per gesture is what's left, and it's the better answer anyway:
+ * a flick moves one day, every time, no matter how hard you flicked. Two days
+ * needs two flicks, and the day headers jump straight to any of them.
+ */
+const DAYS_PER_GESTURE = 1;
+
+/**
  * The hour lines, painted into each day column rather than laid over all of
  * them at once.
  *
@@ -138,19 +169,27 @@ export function TimeGrid({
   }, [days]);
 
   /**
-   * Ignore the sideways part of a gesture that is really a vertical one.
+   * Which way a scroll gesture is going, decided once and then held.
    *
    * A trackpad reports both axes on almost every scroll — run a finger down it
    * and a few pixels of `deltaX` come along for the ride. The grid snaps to
-   * whole day columns, so those few pixels don't drift, they *commit*: the week
-   * jumps a day sideways while you were only trying to get from morning to
-   * afternoon. Same on a mouse whose wheel tilts.
+   * whole day columns, so those stray pixels don't drift, they *commit*: the
+   * week jumps a day sideways while you were only trying to get from morning to
+   * afternoon.
    *
-   * So a gesture only counts as horizontal when it clearly is — sideways
-   * movement at least twice the vertical. Everything else scrolls the grid up
-   * and down and leaves the day you were looking at where it was. A deliberate
-   * sideways swipe has almost no vertical component and passes straight
-   * through.
+   * Comparing the two deltas on each event is the obvious fix and it isn't
+   * enough. As a scroll's momentum dies away `deltaY` decays to 1 or 2 while
+   * `deltaX` stays at 3 or 4, so "sideways is bigger than vertical" becomes
+   * *easier* to satisfy the longer you leave the grid alone — and each of those
+   * tiny events still buys a whole column. That was the hole in the first
+   * version of this, and it's why the jumping carried on.
+   *
+   * So the axis is decided once, at the start of a gesture, and held until the
+   * gesture actually stops (nothing for {@link GESTURE_GAP_MS}). Begin scrolling
+   * down and it stays a downward scroll however much the trackpad wobbles, all
+   * the way through the momentum. Deciding it also takes a real shove sideways —
+   * {@link SIDEWAYS_FLOOR} pixels, not three — so noise can't start a horizontal
+   * gesture either.
    *
    * Attached here rather than with onWheel because React's wheel listener is
    * passive, and a passive listener is not allowed to call preventDefault.
@@ -159,14 +198,47 @@ export function TimeGrid({
     const node = scroller.current;
     if (!node) return;
 
+    let axis: "x" | "y" | null = null;
+    let lastEventAt = 0;
+    /** Whether this gesture has already had its one day. */
+    let stepped = false;
+
     const onWheel = (event: WheelEvent) => {
+      const now = event.timeStamp;
+      if (now - lastEventAt > GESTURE_GAP_MS) {
+        axis = null;
+        stepped = false;
+      }
+      lastEventAt = now;
+
       const sideways = Math.abs(event.deltaX);
-      if (sideways === 0) return;
-      if (sideways >= Math.abs(event.deltaY) * 2) return;
+      const vertical = Math.abs(event.deltaY);
+
+      if (axis === null) {
+        if (sideways >= SIDEWAYS_FLOOR && sideways > vertical * 2) axis = "x";
+        else if (vertical > 0 || sideways > 0) axis = "y";
+        else return;
+      }
+
+      if (axis === "y") {
+        // Nothing to correct on a purely vertical event: let the browser do it,
+        // which keeps its own smoothing rather than replacing it with ours.
+        if (event.deltaX === 0) return;
+        event.preventDefault();
+        node.scrollTop += event.deltaY;
+        return;
+      }
+
+      // Sideways, and meant. One day, then nothing more until the gesture ends
+      // — the rest of a flick and all of its momentum are ignored, which is the
+      // whole point: a hard throw and a gentle push do the same thing.
       event.preventDefault();
-      // The vertical part still has to happen — dropping the whole event would
-      // make the grid feel stuck rather than steady.
-      node.scrollTop += event.deltaY;
+      if (stepped) return;
+      stepped = true;
+      node.scrollBy({
+        left: Math.sign(event.deltaX) * DAYS_PER_GESTURE * MIN_COLUMN,
+        behavior: "smooth",
+      });
     };
 
     node.addEventListener("wheel", onWheel, { passive: false });
