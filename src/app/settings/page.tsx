@@ -10,6 +10,8 @@ import { canStoreSecrets } from "@/lib/secrets";
 import { getDevices, publicKey } from "@/lib/push";
 import { ICloudSetup } from "@/components/icloud-setup";
 import { PushSetup } from "@/components/push-setup";
+import { ThemePicker } from "@/components/theme-picker";
+import { getTheme } from "@/lib/theme";
 import {
   addFeed,
   addPerson,
@@ -51,6 +53,7 @@ export default async function SettingsPage({
   const secretsAvailable = canStoreSecrets();
   const devices = getDevices();
   const vapidPublicKey = publicKey();
+  const theme = await getTheme();
 
   return (
     <>
@@ -307,6 +310,13 @@ export default async function SettingsPage({
           <SubmitButton variant="quiet">Send a test</SubmitButton>
         </ActionForm>
       </div>
+
+      <SectionTitle>Appearance</SectionTitle>
+      <ThemePicker current={theme} />
+      <p className="mt-2 px-1 text-xs text-muted">
+        Auto follows your phone, so it turns dark when your phone does. This is
+        set per phone — yours and your roommate&rsquo;s can differ.
+      </p>
 
       <SectionTitle>Timezone</SectionTitle>
       <Card className="p-4">

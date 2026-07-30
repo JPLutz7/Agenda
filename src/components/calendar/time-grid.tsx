@@ -137,6 +137,42 @@ export function TimeGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
 
+  /**
+   * Ignore the sideways part of a gesture that is really a vertical one.
+   *
+   * A trackpad reports both axes on almost every scroll — run a finger down it
+   * and a few pixels of `deltaX` come along for the ride. The grid snaps to
+   * whole day columns, so those few pixels don't drift, they *commit*: the week
+   * jumps a day sideways while you were only trying to get from morning to
+   * afternoon. Same on a mouse whose wheel tilts.
+   *
+   * So a gesture only counts as horizontal when it clearly is — sideways
+   * movement at least twice the vertical. Everything else scrolls the grid up
+   * and down and leaves the day you were looking at where it was. A deliberate
+   * sideways swipe has almost no vertical component and passes straight
+   * through.
+   *
+   * Attached here rather than with onWheel because React's wheel listener is
+   * passive, and a passive listener is not allowed to call preventDefault.
+   */
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node) return;
+
+    const onWheel = (event: WheelEvent) => {
+      const sideways = Math.abs(event.deltaX);
+      if (sideways === 0) return;
+      if (sideways >= Math.abs(event.deltaY) * 2) return;
+      event.preventDefault();
+      // The vertical part still has to happen — dropping the whole event would
+      // make the grid feel stuck rather than steady.
+      node.scrollTop += event.deltaY;
+    };
+
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
+
   const allDayByDay = days.map((d) => d.events.filter((e) => e.allDay));
   const hasAllDay = allDayByDay.some((list) => list.length > 0);
   const columnStyle = { flex: `1 0 ${single ? 0 : MIN_COLUMN}px` };
@@ -174,6 +210,9 @@ export function TimeGrid({
     <>
     <div
       ref={scroller}
+      // Named so a test can measure what this actually scrolled to. Nothing in
+      // the app reads it.
+      data-scroller=""
       // Snapping to column starts means a day is never left half-scrolled
       // under the pinned hour axis, which would clip the text off its blocks.
       className="relative max-h-[60vh] snap-x snap-mandatory overflow-auto overscroll-contain rounded-xl border border-border bg-surface"

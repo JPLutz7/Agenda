@@ -47,6 +47,7 @@ import {
   type StoredAccount,
 } from "./caldav";
 import { canStoreSecrets, encryptSecret } from "./secrets";
+import { setTheme, type Theme } from "./theme";
 import {
   refreshOneWant,
   refreshPricesIfStale,
@@ -248,6 +249,21 @@ export async function setTimezone(
   setSetting("timezone", tz);
   refreshViews();
   return { ok: `Timezone set to ${tz}.` };
+}
+
+/**
+ * Light, dark, or whatever the phone is doing.
+ *
+ * Takes the choice straight from the button rather than from a form field: it's
+ * one tap on one of three, and a select plus a Save button would be two taps to
+ * change a colour scheme you can see change.
+ */
+export async function chooseTheme(theme: Theme): Promise<void> {
+  await requireSession();
+  await setTheme(theme);
+  // Every page, not just Setup — the whole app just changed colour, and the
+  // layout is what carries it.
+  refreshViews();
 }
 
 /* ----------------------------------------------------------- notifications */

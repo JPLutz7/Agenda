@@ -20,37 +20,86 @@
   font-display: swap;
 }
 
+/*
+ * Two palettes, and three ways to end up on one of them: follow the phone
+ * (the default), or override it in Setup, which writes `data-theme` onto <html>
+ * from a cookie the server reads before it sends the page — so a chosen theme
+ * is already applied in the first paint rather than flipping a moment later.
+ *
+ * Every colour is written once, at the top, and the blocks below only map them.
+ * Two palettes spelled out in full in three places is how one of them quietly
+ * ends up a shade different from the other.
+ */
 :root {
-  --background: #f6f6f7;
-  --surface: #ffffff;
-  --surface-muted: #f0f0f2;
-  --foreground: #16161a;
-  --muted: #6c6c78;
-  --border: #e2e2e7;
-  --accent: #2563eb;
+  --light-background: #f6f6f7;
+  --light-surface: #ffffff;
+  --light-surface-muted: #f0f0f2;
+  --light-foreground: #16161a;
+  --light-muted: #6c6c78;
+  --light-border: #e2e2e7;
+  --light-accent: #2563eb;
   /* A calendar block's background: enough of the person's colour to identify
      it at a glance, little enough that the title stays the darkest thing in
      it. Solid blocks were legible but read as a wall of paint. */
-  --tint-strength: 14%;
+  --light-tint-strength: 14%;
   /* The headline at the top of Today is the one place colour is allowed to be
      loud — it's a single block, so it can carry more of it without the page
      turning into a wall of paint. */
-  --tint-strong: 24%;
+  --light-tint-strong: 24%;
+
+  --dark-background: #0d0d10;
+  --dark-surface: #17171c;
+  --dark-surface-muted: #1f1f26;
+  --dark-foreground: #ececf1;
+  --dark-muted: #9a9aa8;
+  --dark-border: #2a2a33;
+  --dark-accent: #60a5fa;
+  /* Dark surfaces swallow a tint, so it takes a little more of it. */
+  --dark-tint-strength: 26%;
+  --dark-tint-strong: 40%;
+
+  /* Light unless something below says otherwise. */
+  color-scheme: light;
+  --background: var(--light-background);
+  --surface: var(--light-surface);
+  --surface-muted: var(--light-surface-muted);
+  --foreground: var(--light-foreground);
+  --muted: var(--light-muted);
+  --border: var(--light-border);
+  --accent: var(--light-accent);
+  --tint-strength: var(--light-tint-strength);
+  --tint-strong: var(--light-tint-strong);
 }
 
+/* Following the phone's own setting — unless light was asked for explicitly. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0d0d10;
-    --surface: #17171c;
-    --surface-muted: #1f1f26;
-    --foreground: #ececf1;
-    --muted: #9a9aa8;
-    --border: #2a2a33;
-    --accent: #60a5fa;
-    /* Dark surfaces swallow a tint, so it takes a little more of it. */
-    --tint-strength: 26%;
-    --tint-strong: 40%;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: var(--dark-background);
+    --surface: var(--dark-surface);
+    --surface-muted: var(--dark-surface-muted);
+    --foreground: var(--dark-foreground);
+    --muted: var(--dark-muted);
+    --border: var(--dark-border);
+    --accent: var(--dark-accent);
+    --tint-strength: var(--dark-tint-strength);
+    --tint-strong: var(--dark-tint-strong);
   }
+}
+
+/* Chosen in Setup. Must stay after the block above: they carry the same
+   specificity, so this only wins by coming later. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: var(--dark-background);
+  --surface: var(--dark-surface);
+  --surface-muted: var(--dark-surface-muted);
+  --foreground: var(--dark-foreground);
+  --muted: var(--dark-muted);
+  --border: var(--dark-border);
+  --accent: var(--dark-accent);
+  --tint-strength: var(--dark-tint-strength);
+  --tint-strong: var(--dark-tint-strong);
 }
 
 @theme inline {
