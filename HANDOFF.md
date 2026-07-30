@@ -246,6 +246,19 @@ alongside the subscription endpoints, which are in the same database, so
 encrypting one of the two would be theatre. Losing them costs a re-subscribe per
 phone, nothing more.
 
+**Whose an event is, and why it's a per-calendar question.** Ownership decides
+three things at once: the colour, the label, and whether a notification goes to
+both phones or neither — apartment reminders are simply "events with no person
+attached". A published feed's owner is `feeds.person_id`. A CalDAV calendar's
+comes from `caldav_calendars.owner_set` / `owner_person_id`, falling back to the
+account's person when `owner_set` is 0. That override exists because one Apple ID
+holds several calendars and they aren't all one person's: the household's shared
+"Dorm" sits in Joao's account and is the flat's. `looksLikeSharedCalendar` in
+`colors.ts` makes such a calendar the flat's the first time it's seen — on insert
+in `sync.ts` and `connectICloudAccount`, plus a marked one-off pass in `db.ts` for
+calendars discovered before that existed. All three leave a later choice in Setup
+alone; if a sync ever starts overwriting ownership, that's the bug.
+
 **`AGENDA_PUBLIC_URL` is load-bearing** (`src/lib/contact.ts`). It's the VAPID
 subject — "who to contact about this push traffic" — and Apple refuses anything
 that isn't a real https address or a real email address, delivering nothing while
