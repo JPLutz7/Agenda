@@ -49,7 +49,7 @@ export function SubmitButton({
       disabled={pending}
       title={title}
       aria-label={ariaLabel ?? title}
-      className={`shrink-0 font-medium transition disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`pressable shrink-0 font-medium transition disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
     >
       {/* An icon button has no room for "…", and swapping the glyph for one
           would resize the button mid-press. Fading is enough of a signal. */}

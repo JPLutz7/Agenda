@@ -34,6 +34,19 @@ export function PageHeader({
   );
 }
 
+/**
+ * A raised surface: the one description of "a box holding things", written once.
+ *
+ * It was this exact string in six files, which is why some of them had picked up
+ * a shadow and others hadn't, and why one had drifted to a different corner
+ * radius. Anything grouping rows should use it.
+ */
+export const panelClass =
+  "panel rounded-xl border border-border bg-surface";
+
+/** The same, for a list of rows with hairlines between them. */
+export const listClass = `${panelClass} divide-y divide-border overflow-hidden`;
+
 export function Card({
   children,
   className = "",
@@ -41,13 +54,7 @@ export function Card({
   children: ReactNode;
   className?: string;
 }) {
-  return (
-    <section
-      className={`rounded-xl border border-border bg-surface ${className}`}
-    >
-      {children}
-    </section>
-  );
+  return <section className={`${panelClass} ${className}`}>{children}</section>;
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {

@@ -37,7 +37,7 @@ import {
   type CalEvent,
   type CalendarScale,
 } from "@/components/calendar/types";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, listClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -192,7 +192,7 @@ export default async function CalendarPage({
           Nothing scheduled.
         </p>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        <ul className={listClass}>
           {events.map((event) => (
             <EventRow key={event.key} event={event} timeZone={tz} />
           ))}

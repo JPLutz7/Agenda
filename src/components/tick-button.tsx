@@ -21,7 +21,7 @@ export function TickButton({ label }: { label: string }) {
       disabled={pending}
       aria-label={label}
       title={label}
-      className={`group inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition ${
+      className={`pressable group inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition ${
         pending
           ? "border-accent bg-accent text-white"
           : "border-border text-transparent hover:border-accent hover:text-accent"

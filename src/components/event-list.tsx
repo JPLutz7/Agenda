@@ -9,6 +9,7 @@ import type { AgendaEvent } from "@/lib/data";
 import { removeDormEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
 import { Pencil, Trash2 } from "lucide-react";
+import { listClass } from "@/components/ui";
 
 export function EventRow({
   event,
@@ -156,7 +157,7 @@ export function DaySection({
       <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
         {formatDayLabel(day, timeZone)}
       </h2>
-      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+      <ul className={listClass}>
         {events.map((event) => (
           <EventRow
             key={event.key}

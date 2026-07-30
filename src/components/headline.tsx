@@ -26,13 +26,16 @@ export function HeadlineBlock({ headline }: { headline: Headline }) {
       <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted">
         {headline.label}
       </p>
-      {/* The display face and a real jump in size. A heading one notch bigger
-          than the body text isn't a hierarchy, it's a rounding error. */}
-      <p className="mt-1.5 font-display text-[1.6rem] font-semibold leading-[1.15] tracking-tight">
+      {/* Bigger than felt comfortable, on purpose. Every app worth copying here
+          — Flighty's countdown, Dime's running total — sets the one number you
+          came for at two or three times the body text and lets it dominate the
+          screen. At 1.6rem this was merely a heading; a heading one notch above
+          the body isn't a hierarchy, it's a rounding error. */}
+      <p className="mt-1 font-display text-[2.125rem] font-semibold leading-[1.05] tracking-[-0.02em]">
         {headline.title}
       </p>
       {headline.detail && (
-        <p className="mt-1.5 text-sm text-muted">{headline.detail}</p>
+        <p className="mt-2 text-sm font-medium text-muted">{headline.detail}</p>
       )}
     </section>
   );

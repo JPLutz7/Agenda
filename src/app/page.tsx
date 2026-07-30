@@ -10,7 +10,7 @@ import { CompleteChoreTick } from "@/components/chore-controls";
 import { HeadlineBlock } from "@/components/headline";
 import { buildHeadline } from "@/lib/headline";
 import { DORM_COLOR } from "@/lib/colors";
-import { PageHeader, SectionTitle } from "@/components/ui";
+import { PageHeader, SectionTitle, listClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -117,7 +117,7 @@ export default async function HomePage() {
       {dueNow.length > 0 && (
         <>
           <SectionTitle>Needs doing</SectionTitle>
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+          <ul className={listClass}>
             {dueNow.map((chore) => (
               <li key={chore.id} className="flex items-stretch gap-3 px-4 py-3">
                 <CompleteChoreTick choreId={chore.id} title={chore.title} />

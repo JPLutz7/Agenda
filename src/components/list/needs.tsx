@@ -5,7 +5,7 @@ import {
 } from "@/lib/actions";
 import type { ListItem, Person } from "@/lib/data";
 import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
-import { Empty } from "@/components/ui";
+import { Empty, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { OwnerTag } from "./owner";
 import { money } from "./money";
@@ -38,7 +38,7 @@ export function Needs({
       {open.length === 0 ? (
         <Empty>Nothing on the list.</Empty>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        <ul className={listClass}>
           {open.map((item) => (
             <li key={item.id} className="px-2 py-1">
               <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export function Needs({
           <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-muted">
             In the cart ({done.length})
           </h3>
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+          <ul className={listClass}>
             {done.map((item) => (
               <li key={item.id} className="px-2 py-1">
                 <div className="flex items-center gap-2">

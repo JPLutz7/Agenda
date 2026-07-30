@@ -15,7 +15,7 @@ import {
   RemoveChoreButton,
   SnoozeChoreButton,
 } from "@/components/chore-controls";
-import { Empty, PageHeader } from "@/components/ui";
+import { Empty, PageHeader, listClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function ChoresPage() {
       {chores.length === 0 ? (
         <Empty>No chores yet. Add the ones you keep arguing about.</Empty>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        <ul className={listClass}>
           {chores.map((chore) => (
             <li key={chore.id} className="px-4 py-3">
             {/* Tick, colour, words — the same row shape as an event, so the two

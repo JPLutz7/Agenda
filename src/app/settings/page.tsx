@@ -33,7 +33,7 @@ import {
   SubmitButton,
   fieldClass,
 } from "@/components/forms";
-import { Card, Empty, PageHeader, SectionTitle } from "@/components/ui";
+import { Card, Empty, PageHeader, SectionTitle, listClass } from "@/components/ui";
 import { Trash2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +110,7 @@ export default async function SettingsPage({
       {feeds.length === 0 ? (
         <Empty>No calendars connected.</Empty>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        <ul className={listClass}>
           {feeds.map((feed) => (
             <li key={feed.id} className="flex items-start gap-3 px-4 py-3">
               <span
@@ -208,7 +208,7 @@ export default async function SettingsPage({
       </div>
 
       <SectionTitle>Who lives here</SectionTitle>
-      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+      <ul className={listClass}>
         {people.map((person) => (
           <li key={person.id} className="flex items-center gap-3 px-4 py-3">
             <form
@@ -261,7 +261,7 @@ export default async function SettingsPage({
       </Card>
 
       {devices.length > 0 && (
-        <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        <ul className={`${listClass} mt-3`}>
           {devices.map((device) => (
             <li
               key={device.id}

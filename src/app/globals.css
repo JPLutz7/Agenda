@@ -46,6 +46,13 @@
      loud — it's a single block, so it can carry more of it without the page
      turning into a wall of paint. */
   --light-tint-strong: 24%;
+  /* Barely there, and deliberately so. The first attempt at this was a proper
+     floating-card shadow; looking at the actual reference apps afterwards
+     showed almost none of them float their lists — Dime puts rows straight onto
+     the background with no container at all. What they spend instead is type
+     size and empty space. So this is just enough to stop a white panel on a
+     near-white page reading as a flat rectangle. */
+  --light-panel-shadow: 0 1px 2px rgb(16 16 26 / 0.04);
 
   --dark-background: #0d0d10;
   --dark-surface: #17171c;
@@ -57,6 +64,10 @@
   /* Dark surfaces swallow a tint, so it takes a little more of it. */
   --dark-tint-strength: 26%;
   --dark-tint-strong: 40%;
+  /* Nothing: a shadow against near-black is invisible, and faking depth with a
+     lighter edge instead just looks like a mistake. Dark mode separates
+     surfaces by their own lightness. */
+  --dark-panel-shadow: none;
 
   /* Light unless something below says otherwise. */
   color-scheme: light;
@@ -69,6 +80,7 @@
   --accent: var(--light-accent);
   --tint-strength: var(--light-tint-strength);
   --tint-strong: var(--light-tint-strong);
+  --panel-shadow: var(--light-panel-shadow);
 }
 
 /* Following the phone's own setting — unless light was asked for explicitly. */
@@ -84,6 +96,7 @@
     --accent: var(--dark-accent);
     --tint-strength: var(--dark-tint-strength);
     --tint-strong: var(--dark-tint-strong);
+    --panel-shadow: var(--dark-panel-shadow);
   }
 }
 
@@ -100,6 +113,7 @@
   --accent: var(--dark-accent);
   --tint-strength: var(--dark-tint-strength);
   --tint-strong: var(--dark-tint-strong);
+  --panel-shadow: var(--dark-panel-shadow);
 }
 
 @theme inline {
@@ -115,6 +129,43 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * The press.
+ *
+ * Nothing in this app moved when you touched it. On a phone that reads as a
+ * web page rather than as an app: you tap, nothing happens, and then a moment
+ * later the screen changes. The gap is where the doubt lives — did that
+ * register? — and it's why people tap twice.
+ *
+ * A few percent of scale under the finger closes it. It costs no JavaScript, it
+ * happens on the compositor so it can't be delayed by anything the server is
+ * doing, and it's the one piece of the "make it tactile" school that survives
+ * translation to the web: 3D, sound and haptics need a real app, and Safari
+ * won't give a web page a vibration motor at all.
+ */
+.pressable {
+  transition: transform 140ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/*
+ * Panels lift off the background rather than being drawn onto it with a
+ * hairline. The border stays: in dark mode a shadow is invisible against a
+ * near-black background, so the edge is the only thing separating a surface
+ * from the page.
+ */
+.panel {
+  box-shadow: var(--panel-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable:active {
+    transform: none;
+  }
 }
 
 body {

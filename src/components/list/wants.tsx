@@ -7,7 +7,7 @@ import {
 } from "@/lib/actions";
 import type { ListItem, Person } from "@/lib/data";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Empty } from "@/components/ui";
+import { Empty, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { OwnerTag } from "./owner";
 import { money, shopLabel, sinceLabel } from "./money";
@@ -237,7 +237,7 @@ export function Wants({
           <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-muted">
             Bought ({done.length})
           </h3>
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+          <ul className={listClass}>
             {done.map((item) => (
               <li key={item.id} className="flex items-center gap-2 px-2 py-1">
                 <form
