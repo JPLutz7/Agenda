@@ -18,6 +18,11 @@ primary_region = "ord"
 [env]
   AGENDA_DB_PATH = "/data/agenda.db"
   PORT = "3000"
+  # Where this app answers. Notifications need it: it goes into every push as
+  # the "who to contact about this traffic" claim, and Apple refuses anything
+  # that isn't a real address — a placeholder means nothing is ever delivered,
+  # with both phones still showing as registered. Change this if the app moves.
+  AGENDA_PUBLIC_URL = "https://agenda-nd.fly.dev"
 
 # The household's data. Without this the SQLite file lives in the container's
 # temporary filesystem and every deploy wipes it.

@@ -2,6 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 import webpush, { type PushSubscription } from "web-push";
 import { db, getSetting, setSetting } from "./db";
+import { contactProblem, pushContact } from "./contact";
 import { assigneeFor, getEvents, getPeople, timezone } from "./data";
 import { formatTime, minutesIntoDay, today } from "./dates";
 
@@ -22,8 +23,6 @@ import { formatTime, minutesIntoDay, today } from "./dates";
  * time either of them opens the app. If anyone ever adds caching to that file,
  * they've traded away the thing that makes this app trustworthy.
  */
-
-const CONTACT = "mailto:agenda@localhost";
 
 type Keys = { publicKey: string; privateKey: string };
 
@@ -77,13 +76,47 @@ export type Notice = {
   tag?: string;
 };
 
-async function deliver(rows: Row[], notice: Notice): Promise<number> {
-  if (rows.length === 0) return 0;
+export type DeliveryReport = {
+  /** How many phones actually took it. */
+  sent: number;
+  /** How many were tried. Zero means nobody has turned notifications on. */
+  attempted: number;
+  /**
+   * How many turned out to have revoked, and were dropped from the list. Not a
+   * failure to explain away — it's the normal end of a subscription, and it
+   * needs its own count so it can be described as that rather than as an error.
+   */
+  gone: number;
+  /** Why the failures failed, deduplicated — for showing, not for logs. */
+  errors: string[];
+};
+
+const NOTHING: DeliveryReport = { sent: 0, attempted: 0, gone: 0, errors: [] };
+
+async function deliver(rows: Row[], notice: Notice): Promise<DeliveryReport> {
+  if (rows.length === 0) return NOTHING;
+
+  // Checked here rather than at startup: a misconfigured contact address should
+  // surface where somebody is looking at it, not in a log nobody reads.
+  const contact = pushContact();
+  const problem = contactProblem(contact);
+  if (problem) {
+    for (const row of rows) {
+      db.prepare(
+        `UPDATE push_subscriptions
+         SET last_error = ?, failures = failures + 1 WHERE id = ?`,
+      ).run(problem, row.id);
+    }
+    return { sent: 0, attempted: rows.length, gone: 0, errors: [problem] };
+  }
+
   const keys = vapidKeys();
-  webpush.setVapidDetails(CONTACT, keys.publicKey, keys.privateKey);
+  webpush.setVapidDetails(contact, keys.publicKey, keys.privateKey);
 
   const payload = JSON.stringify(notice);
   let sent = 0;
+  let gone = 0;
+  const errors = new Set<string>();
 
   await Promise.all(
     rows.map(async (row) => {
@@ -104,9 +137,11 @@ async function deliver(rows: Row[], notice: Notice): Promise<number> {
         // dead endpoint forever.
         if (status === 404 || status === 410) {
           db.prepare("DELETE FROM push_subscriptions WHERE id = ?").run(row.id);
+          gone += 1;
           return;
         }
         const message = err instanceof Error ? err.message : String(err);
+        errors.add(status ? `${status}: ${message}` : message);
         db.prepare(
           `UPDATE push_subscriptions
            SET last_error = ?, failures = failures + 1
@@ -116,12 +151,12 @@ async function deliver(rows: Row[], notice: Notice): Promise<number> {
     }),
   );
 
-  return sent;
+  return { sent, attempted: rows.length, gone, errors: [...errors] };
 }
 
 const SELECT = "SELECT id, endpoint, p256dh, auth FROM push_subscriptions";
 
-export async function notifyEveryone(notice: Notice): Promise<number> {
+export async function notifyEveryone(notice: Notice): Promise<DeliveryReport> {
   return deliver(db.prepare<[], Row>(SELECT).all(), notice);
 }
 
@@ -135,7 +170,7 @@ export async function notifyEveryone(notice: Notice): Promise<number> {
 export async function notifyPerson(
   personId: number,
   notice: Notice,
-): Promise<number> {
+): Promise<DeliveryReport> {
   return deliver(
     db.prepare<[number], Row>(`${SELECT} WHERE person_id = ?`).all(personId),
     notice,
@@ -146,7 +181,7 @@ export async function notifyPerson(
 export async function notifyOthers(
   personId: number | null,
   notice: Notice,
-): Promise<number> {
+): Promise<DeliveryReport> {
   if (personId === null) return notifyEveryone(notice);
   return deliver(
     db
@@ -174,12 +209,16 @@ export type DeviceRow = {
   person_name: string | null;
   created_at: string;
   last_sent_at: string | null;
+  /** The last refusal from the push service, if the last attempt failed. */
+  last_error: string | null;
+  failures: number;
 };
 
 export function getDevices(): DeviceRow[] {
   return db
     .prepare<[], DeviceRow>(
-      `SELECT s.id, s.label, s.created_at, s.last_sent_at, p.name AS person_name
+      `SELECT s.id, s.label, s.created_at, s.last_sent_at, s.last_error,
+              s.failures, p.name AS person_name
        FROM push_subscriptions s
        LEFT JOIN people p ON p.id = s.person_id
        ORDER BY s.id`,
@@ -237,9 +276,10 @@ export async function notifyChoresDue(): Promise<number> {
       url: "/chores",
       tag: `chore-${chore.id}`,
     };
-    sent += who
+    const report = who
       ? await notifyPerson(who.id, notice)
       : await notifyEveryone(notice);
+    sent += report.sent;
   }
   return sent;
 }
@@ -318,7 +358,7 @@ export async function notifyApartmentEventsToday(): Promise<number> {
     if (getSetting(marker) === day) continue;
     setSetting(marker, day);
 
-    sent += await notifyEveryone({
+    const report = await notifyEveryone({
       title: event.summary,
       body: event.allDay
         ? "On the apartment calendar today."
@@ -326,6 +366,7 @@ export async function notifyApartmentEventsToday(): Promise<number> {
       url: "/",
       tag: `event-${identity}`,
     });
+    sent += report.sent;
   }
   return sent;
 }

@@ -316,17 +316,40 @@ export async function removePushDevice(deviceId: number): Promise<void> {
  */
 export async function sendTestNotification(): Promise<ActionState> {
   await requireSession();
-  const sent = await notifyEveryone({
+  const { sent, attempted, gone, errors } = await notifyEveryone({
     title: "Agenda works",
     body: "That's all this was for. Notifications are on.",
     url: "/",
     tag: "test",
   });
+
+  // The attempt changed the device list — a success stamps "last notified", a
+  // failure stamps why, and a revoked phone is gone from it entirely. Without
+  // this the rows above the button still describe the state before the tap.
+  refreshViews();
+
+  // Four different situations that used to report as one — "nothing went out,
+  // no phone is registered, or they've turned them off" — which is no help at
+  // all when a phone *is* registered and the send is being refused.
+  if (attempted === 0) {
+    return {
+      error: "No phone is registered yet. Turn notifications on above first.",
+    };
+  }
+  if (sent === 0 && gone === attempted) {
+    return {
+      error:
+        `Nothing went out: ${gone === 1 ? "that phone" : "those phones"} had ` +
+        `notifications turned off again, so ${gone === 1 ? "it has" : "they have"} ` +
+        `been taken off the list. Turn them on again to start over.`,
+    };
+  }
   if (sent === 0) {
     return {
       error:
-        "Nothing went out — no phone is registered yet, or the ones that " +
-        "were have since turned notifications off.",
+        `Nothing went out. Tried ${attempted} ` +
+        `device${attempted === 1 ? "" : "s"}. ` +
+        (errors.length > 0 ? errors.join(" ") : "The push service refused it."),
     };
   }
   return { ok: `Sent to ${sent} device${sent === 1 ? "" : "s"}.` };

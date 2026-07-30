@@ -233,43 +233,55 @@ export default async function SettingsPage({
       </Card>
 
       {devices.length > 0 && (
-        <>
-          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-            {devices.map((device) => (
-              <li
-                key={device.id}
-                className="flex items-center gap-2 px-4 py-3 text-sm"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">
-                    {device.person_name ?? "Unassigned"}
-                    {device.label ? ` · ${device.label}` : ""}
-                  </span>
-                  <span className="block text-xs text-muted">
-                    {device.last_sent_at
-                      ? `Last notified ${device.last_sent_at.slice(0, 10)}`
-                      : "Nothing sent yet"}
-                  </span>
+        <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+          {devices.map((device) => (
+            <li
+              key={device.id}
+              className="flex items-center gap-2 px-4 py-3 text-sm"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">
+                  {device.person_name ?? "Unassigned"}
+                  {device.label ? ` · ${device.label}` : ""}
                 </span>
-                <form action={removePushDevice.bind(null, device.id)}>
-                  <SubmitButton
-                    variant="danger"
-                    size="icon"
-                    title="Stop sending to this device"
-                  >
-                    <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                  </SubmitButton>
-                </form>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3">
-            <ActionForm action={sendTestNotification}>
-              <SubmitButton variant="quiet">Send a test</SubmitButton>
-            </ActionForm>
-          </div>
-        </>
+                <span className="block text-xs text-muted">
+                  {device.last_sent_at
+                    ? `Last notified ${device.last_sent_at.slice(0, 10)}`
+                    : "Nothing sent yet"}
+                </span>
+                {/* A phone that's registered but being refused looks identical
+                    to one that's fine, unless the refusal is shown. It's the
+                    difference between "nothing arrived" and knowing why. */}
+                {device.last_error && (
+                  <span className="mt-0.5 block text-xs text-red-500">
+                    Last attempt failed — {device.last_error}
+                  </span>
+                )}
+              </span>
+              <form action={removePushDevice.bind(null, device.id)}>
+                <SubmitButton
+                  variant="danger"
+                  size="icon"
+                  title="Stop sending to this device"
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+                </SubmitButton>
+              </form>
+            </li>
+          ))}
+        </ul>
       )}
+
+      {/* Outside the list on purpose. It used to sit inside it, so a test that
+          failed because the phone had revoked deleted the only row, took the
+          button and its explanation down with it, and left a tap that appeared
+          to do nothing. The answer to "did that work?" has to survive the
+          answer being no. */}
+      <div className="mt-3">
+        <ActionForm action={sendTestNotification}>
+          <SubmitButton variant="quiet">Send a test</SubmitButton>
+        </ActionForm>
+      </div>
 
       <SectionTitle>Timezone</SectionTitle>
       <Card className="p-4">
