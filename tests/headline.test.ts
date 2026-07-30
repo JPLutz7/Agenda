@@ -8,7 +8,11 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildHeadline, relativeTime } from "../src/lib/headline.ts";
+import {
+  buildHeadline,
+  countdownTo,
+  relativeTime,
+} from "../src/lib/headline.ts";
 
 const TZ = "America/Indiana/Indianapolis";
 const DORM = "#d4a017";
@@ -43,7 +47,9 @@ test("otherwise it's the next thing, with how long you've got", () => {
   const h = build([event("Landlord inspection", at(18, 40), at(19, 40))]);
   assert.equal(h.kind, "next");
   assert.equal(h.title, "Landlord inspection");
-  assert.equal(h.detail, "in 40 minutes · 2:40 PM");
+  // The clock time only. The row for this event does its own counting down,
+  // and the same fact stated twice on one screen reads as two facts.
+  assert.equal(h.detail, "2:40 PM");
 });
 
 test("an event that has finished is not the next thing", () => {
@@ -95,7 +101,7 @@ test("with nothing on the calendar it falls back to the chores", () => {
 test("and only claims a clear day when it really is one", () => {
   const h = build([]);
   assert.equal(h.kind, "clear");
-  assert.equal(h.title, "Nothing on");
+  assert.equal(h.title, "Nothing left today");
   assert.equal(h.color, null);
 });
 
@@ -109,4 +115,26 @@ test("relative time never reads like a machine wrote it", () => {
   assert.equal(relativeTime(120), "in 2 hours");
   // Far enough away that the minutes are noise rather than information.
   assert.equal(relativeTime(372), "in 6 hours");
+});
+
+test("the countdown on a row: a figure and its unit, sized differently", () => {
+  // 40 minutes out.
+  assert.deepEqual(countdownTo(at(18, 40), at(19, 40), NOW),
+    { value: "40", unit: "minutes" });
+  assert.deepEqual(countdownTo(at(18, 1), at(19), NOW),
+    { value: "1", unit: "minute" });
+  // Rounds down, so "1 hour" never shows while it's still nearly two.
+  assert.deepEqual(countdownTo(at(19, 59), at(20, 59), NOW),
+    { value: "1", unit: "hour" });
+  assert.deepEqual(countdownTo(at(20), at(21), NOW),
+    { value: "2", unit: "hours" });
+});
+
+test("and what it refuses to count", () => {
+  // Already finished.
+  assert.equal(countdownTo(at(12), at(13), NOW), null);
+  // Underway: no number, because the answer is that it's happening.
+  assert.deepEqual(countdownTo(at(17, 30), at(19), NOW), { value: "Now", unit: "" });
+  // Far enough away that the hour it starts says more than the count does.
+  assert.equal(countdownTo("2026-07-31T18:00:00.000Z", "2026-07-31T19:00:00.000Z", NOW), null);
 });

@@ -1,42 +1,40 @@
 import type { Headline } from "@/lib/headline";
-import { tintedBlock } from "@/components/ui";
 
 /**
- * The answer, before the list.
+ * One line, under the date.
  *
- * Deliberately the largest thing on the screen. Everything under it is a list of
- * equal-weight rows, which is fine for detail and useless for "so what?" — you
- * had to read all of them and do the arithmetic against the clock yourself. One
- * line in large type does that work for you, and the list becomes what it should
- * always have been: the supporting evidence.
+ * This used to be the big tinted block at the top of Today, and it was the
+ * right idea in the wrong place. Now that every row counts down to itself, a
+ * large block naming the next thing says the same sentence twice on one screen
+ * — and two answers to one question is worse than either alone, because you
+ * have to check whether they agree.
  *
- * Coloured by whatever it's about — whose event it is, or the dorm's own colour
- * when it's about chores — so the answer is identifiable before it's read.
+ * So the rows carry the answer and this carries the summary: which of them is
+ * next, and the cases a row can't cover — a day with nothing on it, or one
+ * where the only thing left is a chore, which has no time to count down to.
  */
-export function HeadlineBlock({ headline }: { headline: Headline }) {
-  const tinted = headline.color !== null;
-
+export function HeadlineLine({ headline }: { headline: Headline }) {
   return (
-    <section
-      className={`mb-6 rounded-2xl px-5 py-4 ${
-        tinted ? "" : "border border-dashed border-border"
-      }`}
-      style={tinted ? tintedBlock(headline.color!, "strong") : undefined}
+    <p
+      // Named so a test can find this line rather than counting paragraphs
+      // from the top — the first count landed on the date above it. Nothing in
+      // the app reads it.
+      data-summary=""
+      className="mb-5 flex items-baseline gap-2 px-1 text-sm"
     >
-      <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted">
-        {headline.label}
-      </p>
-      {/* Bigger than felt comfortable, on purpose. Every app worth copying here
-          — Flighty's countdown, Dime's running total — sets the one number you
-          came for at two or three times the body text and lets it dominate the
-          screen. At 1.6rem this was merely a heading; a heading one notch above
-          the body isn't a hierarchy, it's a rounding error. */}
-      <p className="mt-1 font-display text-[2.125rem] font-semibold leading-[1.05] tracking-[-0.02em]">
-        {headline.title}
-      </p>
-      {headline.detail && (
-        <p className="mt-2 text-sm font-medium text-muted">{headline.detail}</p>
+      {headline.color && (
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full"
+          style={{ backgroundColor: headline.color }}
+        />
       )}
-    </section>
+      <span className="min-w-0">
+        <span className="font-semibold">{headline.title}</span>
+        {headline.detail && (
+          <span className="text-muted"> · {headline.detail}</span>
+        )}
+      </span>
+    </p>
   );
 }

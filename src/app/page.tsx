@@ -7,7 +7,7 @@ import { addDays, formatDayLabel } from "@/lib/dates";
 import { DaySection } from "@/components/event-list";
 import { AddDormEventForm } from "@/components/add-event-form";
 import { CompleteChoreTick } from "@/components/chore-controls";
-import { HeadlineBlock } from "@/components/headline";
+import { HeadlineLine } from "@/components/headline";
 import { buildHeadline } from "@/lib/headline";
 import { DORM_COLOR } from "@/lib/colors";
 import { PageHeader, SectionTitle, listClass } from "@/components/ui";
@@ -112,7 +112,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      <HeadlineBlock headline={headline} />
+      <HeadlineLine headline={headline} />
 
       {dueNow.length > 0 && (
         <>

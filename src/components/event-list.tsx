@@ -6,6 +6,7 @@ import {
   type DayKey,
 } from "@/lib/dates";
 import type { AgendaEvent } from "@/lib/data";
+import { countdownTo, type Countdown } from "@/lib/headline";
 import { removeDormEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
 import { Pencil, Trash2 } from "lucide-react";
@@ -20,12 +21,15 @@ export function EventRow({
   next = false,
   /** Happening right now. */
   now = false,
+  /** How long until it starts, when that's the more useful thing to show. */
+  countdown = null,
 }: {
   event: AgendaEvent;
   timeZone: string;
   past?: boolean;
   next?: boolean;
   now?: boolean;
+  countdown?: Countdown | null;
 }) {
   // Nobody's name on it means it's the dorm's, whichever calendar it came from.
   // This used to be said only for events added in the app, so one from a shared
@@ -44,17 +48,37 @@ export function EventRow({
         past ? "opacity-45" : ""
       } ${next || now ? "bg-accent/5" : ""}`}
     >
-      {/* The time reads down the left edge, so a day can be scanned by when
-          rather than by what — and the title gets the rest of the row instead
-          of being cut off at half width to make room for it. */}
-      <div className="w-[3.75rem] shrink-0 pt-px text-right">
-        <span
-          className={`text-xs font-medium tabular-nums ${
-            now || next ? "text-accent" : "text-muted"
-          }`}
-        >
-          {event.allDay ? "All day" : formatTime(event.startsAt, timeZone)}
-        </span>
+      {/* The left rail. When a thing is close enough to count down to, the
+          count *is* the rail — a figure big enough to read without looking,
+          with its unit as a caption. A clock time makes you subtract it from
+          the clock in your status bar; "23 minutes" has already done that.
+          Everything else — finished, all-day, another day — keeps the time,
+          which is the more useful fact once a countdown stops being one. */}
+      <div className="w-16 shrink-0 pt-px text-right">
+        {countdown ? (
+          <>
+            <span
+              className={`block font-display text-[1.375rem] font-semibold leading-none tracking-tight tabular-nums ${
+                now ? "text-accent" : "text-foreground"
+              }`}
+            >
+              {countdown.value}
+            </span>
+            {countdown.unit && (
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted">
+                {countdown.unit}
+              </span>
+            )}
+          </>
+        ) : (
+          <span
+            className={`text-xs font-medium tabular-nums ${
+              now || next ? "text-accent" : "text-muted"
+            }`}
+          >
+            {event.allDay ? "All day" : formatTime(event.startsAt, timeZone)}
+          </span>
+        )}
       </div>
       <span
         aria-hidden="true"
@@ -166,6 +190,13 @@ export function DaySection({
             past={isOver(event)}
             now={event.key === underwayKey}
             next={event.key === nextKey}
+            // Only today's timed entries: counting down to something on
+            // Saturday would say "hours" for two days running.
+            countdown={
+              timed(event)
+                ? countdownTo(event.startsAt, event.endsAt, nowIso!)
+                : null
+            }
           />
         ))}
       </ul>

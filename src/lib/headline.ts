@@ -69,6 +69,42 @@ const minutesBetween = (fromIso: string, toIso: string) =>
     (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60000,
   );
 
+/**
+ * How long until a thing, as a number and a word — "23" / "minutes".
+ *
+ * Split in two because they're set at different sizes: the figure is the
+ * largest thing in its row and the unit is a caption under it. That's Flighty's
+ * arrangement, and the reason it works is that a clock time makes you do
+ * arithmetic against the clock in your status bar, while "23 minutes" is
+ * already the answer.
+ *
+ * Null means there's nothing useful to count down to: it's over, it's an
+ * all-day thing, or it's far enough away that the hour it starts is the more
+ * meaningful fact.
+ */
+export type Countdown = { value: string; unit: string };
+
+/** Past this, a clock time says more than a count of hours does. */
+const COUNTDOWN_HORIZON_MINUTES = 12 * 60;
+
+export function countdownTo(
+  startsAt: string,
+  endsAt: string,
+  nowIso: string,
+): Countdown | null {
+  if (endsAt <= nowIso) return null;
+  if (startsAt <= nowIso) return { value: "Now", unit: "" };
+
+  const minutes = minutesBetween(nowIso, startsAt);
+  if (minutes > COUNTDOWN_HORIZON_MINUTES) return null;
+  // Rounds down, so "1 hour" never appears while it's still 1 hour 59 away.
+  if (minutes < 60) {
+    return { value: String(minutes), unit: minutes === 1 ? "minute" : "minutes" };
+  }
+  const hours = Math.floor(minutes / 60);
+  return { value: String(hours), unit: hours === 1 ? "hour" : "hours" };
+}
+
 export function buildHeadline({
   events,
   chores,
@@ -108,10 +144,10 @@ export function buildHeadline({
       kind: "next",
       label: "Next",
       title: next.summary,
-      detail: `${relativeTime(minutesBetween(nowIso, next.startsAt))} · ${formatTime(
-        next.startsAt,
-        timeZone,
-      )}`,
+      // The clock time, not "in 40 minutes". The row for this event counts
+      // itself down; saying it twice on one screen just invites you to check
+      // whether the two agree.
+      detail: formatTime(next.startsAt, timeZone),
       color: next.color,
     };
   }
@@ -149,8 +185,8 @@ export function buildHeadline({
   return {
     kind: "clear",
     label: "Today",
-    title: "Nothing on",
-    detail: "Nothing left on the calendar and no chores due.",
+    title: "Nothing left today",
+    detail: "",
     color: null,
   };
 }
