@@ -92,7 +92,7 @@ export async function syncNow(): Promise<void> {
   } catch {
     // Nothing to undo — a feed is rebuilt inside a transaction, so a failed
     // pull leaves the last good copy in place. The page still revalidates:
-    // household events and chores are local and are current regardless, and
+    // dorm events and chores are local and are current regardless, and
     // Setup lists each source's own error.
   }
   refreshPricesIfStale();
@@ -101,11 +101,11 @@ export async function syncNow(): Promise<void> {
 
 /* ------------------------------------------------------------------ setup */
 
-export async function setupHousehold(
+export async function setupDorm(
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
-  if (isPasscodeSet()) return { error: "This household is already set up." };
+  if (isPasscodeSet()) return { error: "This dorm is already set up." };
 
   const passcode = text(form, "passcode", 100);
   const nameA = text(form, "name_a", 60);
@@ -193,7 +193,7 @@ export async function addFeed(
   const label = text(form, "label", 80) || "Calendar";
   const rawUrl = text(form, "url", 2000);
   const personRaw = text(form, "person_id", 20);
-  const personId = personRaw === "" || personRaw === "household"
+  const personId = personRaw === "" || personRaw === "dorm"
     ? null
     : Number(personRaw);
 
@@ -272,7 +272,7 @@ export async function savePushSubscription(
   const auth = text(form, "auth", 200);
   const label = text(form, "label", 60) || null;
   const personRaw = text(form, "person_id", 20);
-  const personId = personRaw === "" || personRaw === "household"
+  const personId = personRaw === "" || personRaw === "dorm"
     ? null
     : Number(personRaw) || null;
 
@@ -375,7 +375,7 @@ export async function connectICloudAccount(
   // Apple prints app-specific passwords with spaces; they aren't part of it.
   const password = text(form, "password", 200).replace(/\s+/g, "");
   const personRaw = text(form, "person_id", 20);
-  const personId = personRaw === "" || personRaw === "household"
+  const personId = personRaw === "" || personRaw === "dorm"
     ? null
     : Number(personRaw);
   const label = text(form, "label", 80) || username;
@@ -506,7 +506,7 @@ export async function setWriteCalendar(
  *
  * It's chosen when the account is connected, but that's a one-off decision
  * made in a hurry, and getting it wrong meant a person's whole calendar
- * showed in the apartment's colour with no way back short of reconnecting.
+ * showed in the dorm's colour with no way back short of reconnecting.
  */
 export async function setAccountPerson(
   accountId: number,
@@ -514,7 +514,7 @@ export async function setAccountPerson(
 ): Promise<void> {
   await requireSession();
   const raw = text(form, "person_id", 20);
-  const personId = raw === "" || raw === "household" ? null : Number(raw);
+  const personId = raw === "" || raw === "dorm" ? null : Number(raw);
   if (personId !== null && !Number.isInteger(personId)) return;
   db.prepare("UPDATE caldav_accounts SET person_id = ? WHERE id = ?").run(
     personId,
@@ -531,11 +531,11 @@ export async function setAccountPerson(
  * where the rent and the landlord's visits go, and both of you need telling
  * about those. Before this, everything under an account took the account's
  * owner, so the shared calendar showed in one person's colour with his name on
- * it and was left out of the apartment reminders entirely — those go to whatever
+ * it and was left out of the dorm reminders entirely — those go to whatever
  * has nobody's name on it.
  *
  * Three answers, so three values: "account" to follow the account (the
- * default), "household" for the apartment, or a person's id.
+ * default), "dorm" for the dorm, or a person's id.
  */
 export async function setCalendarPerson(
   calendarId: number,
@@ -551,7 +551,7 @@ export async function setCalendarPerson(
     refreshViews();
     return;
   }
-  const personId = raw === "" || raw === "household" ? null : Number(raw);
+  const personId = raw === "" || raw === "dorm" ? null : Number(raw);
   if (personId !== null && !Number.isInteger(personId)) return;
   db.prepare(
     `UPDATE caldav_calendars
@@ -566,7 +566,7 @@ export async function setCalendarPerson(
  * A feed's owner was settled when it was added and then fixed forever, so a
  * "Dorm" pasted in as somebody's could only be corrected by deleting it and
  * starting again. A feed has no account above it, so there are only two answers
- * here: a person, or the apartment.
+ * here: a person, or the dorm.
  */
 export async function setFeedPerson(
   feedId: number,
@@ -574,7 +574,7 @@ export async function setFeedPerson(
 ): Promise<void> {
   await requireSession();
   const raw = text(form, "person_id", 20);
-  const personId = raw === "" || raw === "household" ? null : Number(raw);
+  const personId = raw === "" || raw === "dorm" ? null : Number(raw);
   if (personId !== null && !Number.isInteger(personId)) return;
   db.prepare("UPDATE feeds SET person_id = ? WHERE id = ?").run(
     personId,
@@ -599,7 +599,7 @@ export async function disconnectICloudAccount(
  * The `events` table is a mirror of what the last sync saw, and a sync only
  * rebuilds a calendar when that calendar is pulled. So between deleting an
  * event remotely and the next pull, the stale row is still there — and since
- * the household row that used to claim it is gone (or has moved to a new UID),
+ * the dorm row that used to claim it is gone (or has moved to a new UID),
  * nothing suppresses it any more and it comes back on screen as if it were
  * someone's own calendar event. Deleting an event and watching it reappear is
  * about the worst thing a calendar can do, so the mirror is corrected here
@@ -618,7 +618,7 @@ function writeAccountFor(calendarAccountId: number): StoredAccount | undefined {
     .get(calendarAccountId);
 }
 
-/* -------------------------------------------------------- household events */
+/* -------------------------------------------------------- dorm events */
 
 type EventDraft = {
   title: string;
@@ -668,7 +668,7 @@ function readEventForm(form: FormData): { draft?: EventDraft; error?: string } {
     };
   }
 
-  // The form collects wall-clock time in the household timezone; convert to
+  // The form collects wall-clock time in the dorm timezone; convert to
   // the UTC instant the rest of the app stores.
   const startsAt = wallClockToUtc(date, startTime, timezone());
   const endsAt = endTime
@@ -703,7 +703,7 @@ function readCalendarChoice(
   return { calendar };
 }
 
-export async function addHouseholdEvent(
+export async function addDormEvent(
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
@@ -748,7 +748,7 @@ export async function addHouseholdEvent(
   }
 
   db.prepare(
-    `INSERT INTO household_events
+    `INSERT INTO dorm_events
        (title, notes, starts_at, ends_at, all_day,
         caldav_calendar_id, caldav_url, caldav_uid, caldav_etag)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -764,7 +764,7 @@ export async function addHouseholdEvent(
     remote?.etag ?? null,
   );
 
-  await announceApartmentEvent("added", title, startsAt, allDay);
+  await announceDormEvent("added", title, startsAt, allDay);
   refreshViews();
   return {
     ok: writeCalendar
@@ -773,7 +773,7 @@ export async function addHouseholdEvent(
   };
 }
 
-type StoredHouseholdEvent = {
+type StoredDormEvent = {
   id: number;
   title: string;
   caldav_calendar_id: number | null;
@@ -796,7 +796,7 @@ type StoredHouseholdEvent = {
  * whereas deleting first would put a failed create between the user and an
  * event that no longer exists anywhere.
  */
-export async function updateHouseholdEvent(
+export async function updateDormEvent(
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
@@ -804,9 +804,9 @@ export async function updateHouseholdEvent(
 
   const eventId = Number(text(form, "event_id", 20));
   const existing = db
-    .prepare<[number], StoredHouseholdEvent>(
+    .prepare<[number], StoredDormEvent>(
       `SELECT id, title, caldav_calendar_id, caldav_url, caldav_uid, caldav_etag
-       FROM household_events WHERE id = ?`,
+       FROM dorm_events WHERE id = ?`,
     )
     .get(eventId);
   if (!existing) return { error: "That event no longer exists." };
@@ -909,7 +909,7 @@ export async function updateHouseholdEvent(
   }
 
   db.prepare(
-    `UPDATE household_events
+    `UPDATE dorm_events
      SET title = ?, notes = ?, starts_at = ?, ends_at = ?, all_day = ?,
          caldav_calendar_id = ?, caldav_url = ?, caldav_uid = ?, caldav_etag = ?
      WHERE id = ?`,
@@ -926,7 +926,7 @@ export async function updateHouseholdEvent(
     eventId,
   );
 
-  await announceApartmentEvent("moved", title, startsAt, allDay);
+  await announceDormEvent("moved", title, startsAt, allDay);
   refreshViews();
   if (strandedCopy) {
     return {
@@ -938,7 +938,7 @@ export async function updateHouseholdEvent(
   return { ok: `Saved "${title}".` };
 }
 
-export async function removeHouseholdEvent(eventId: number): Promise<void> {
+export async function removeDormEvent(eventId: number): Promise<void> {
   await requireSession();
 
   const event = db
@@ -956,7 +956,7 @@ export async function removeHouseholdEvent(eventId: number): Promise<void> {
     >(
       `SELECT title, starts_at, all_day,
               caldav_calendar_id, caldav_url, caldav_uid, caldav_etag
-       FROM household_events WHERE id = ?`,
+       FROM dorm_events WHERE id = ?`,
     )
     .get(eventId);
   if (!event) return;
@@ -980,9 +980,9 @@ export async function removeHouseholdEvent(eventId: number): Promise<void> {
     }
   }
 
-  db.prepare("DELETE FROM household_events WHERE id = ?").run(eventId);
+  db.prepare("DELETE FROM dorm_events WHERE id = ?").run(eventId);
   forgetCachedEvent(event.caldav_uid);
-  await announceApartmentEvent(
+  await announceDormEvent(
     "cancelled",
     event.title,
     event.starts_at,
@@ -1186,15 +1186,15 @@ function priceToCents(raw: string): number | null {
 }
 
 /**
- * Whose an item is: a person id, or null for the apartment.
+ * Whose an item is: a person id, or null for the dorm.
  *
- * The picker sends the literal 'household' for the flat. Anything unparseable
+ * The picker sends the literal 'dorm' for the flat. Anything unparseable
  * lands on null too, which is the safe end — an item nobody is named on reads
  * as shared, where a wrong name reads as an accusation about who wanted it.
  */
 function readOwner(form: FormData): number | null {
   const raw = text(form, "added_by", 20);
-  if (raw === "" || raw === "household") return null;
+  if (raw === "" || raw === "dorm") return null;
   const id = Number(raw);
   return Number.isInteger(id) && id > 0 ? id : null;
 }
@@ -1272,15 +1272,15 @@ export async function addListItem(
 }
 
 /**
- * Tell the *other* phone that the apartment calendar changed.
+ * Tell the *other* phone that the dorm calendar changed.
  *
- * The apartment calendar is the one thing in here that is nobody's and both
+ * The dorm calendar is the one thing in here that is nobody's and both
  * people's, so a landlord visit appearing — or moving, or being called off — is
  * news to whoever didn't do it. Same rule as the shopping list: the adder comes
  * from the device cookie, and a phone that never turned notifications on stays
  * silent rather than being told about its own typing.
  */
-async function announceApartmentEvent(
+async function announceDormEvent(
   verb: "added" | "moved" | "cancelled",
   title: string,
   startsAt: string,
@@ -1298,12 +1298,12 @@ async function announceApartmentEvent(
   await notifyOthers(actor, {
     title:
       verb === "cancelled"
-        ? `Off the apartment calendar: ${title}`
+        ? `Off the dorm calendar: ${title}`
         : `${title} — ${when}`,
     body:
       verb === "cancelled"
         ? `${name ?? "Someone"} removed it.`
-        : `${name ?? "Someone"} ${verb} it on the apartment calendar.`,
+        : `${name ?? "Someone"} ${verb} it on the dorm calendar.`,
     url: "/calendar?view=day&date=" + day,
     // Keyed to the event so a title typed, then corrected, replaces itself
     // rather than arriving twice.
@@ -1316,7 +1316,7 @@ async function announceApartmentEvent(
  *
  * Whose phone did the adding comes from the device cookie, not from the item's
  * owner tag — those are different questions, and most items are tagged as the
- * apartment's. Without knowing the adder this would buzz you about your own
+ * dorm's. Without knowing the adder this would buzz you about your own
  * shopping, so a phone that never turned notifications on stays silent rather
  * than guessing.
  */

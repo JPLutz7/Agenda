@@ -73,7 +73,7 @@ export default async function ListPage({
         title="Shopping list"
         subtitle={
           tab === "needs"
-            ? "What the apartment is out of."
+            ? "What the dorm is out of."
             : "Things you're saving up for."
         }
       />

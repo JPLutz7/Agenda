@@ -118,7 +118,7 @@ export default async function SettingsPage({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{feed.label}</p>
                 <p className="mt-0.5 text-xs text-muted">
-                  {feed.person_name ?? "Apartment"} · {feed.event_count} events
+                  {feed.person_name ?? "Dorm"} · {feed.event_count} events
                   {feed.last_synced_at
                     ? ` · synced ${feed.last_synced_at} UTC`
                     : " · never synced"}
@@ -132,11 +132,11 @@ export default async function SettingsPage({
                 >
                   <select
                     name="person_id"
-                    defaultValue={feed.person_id ?? "household"}
+                    defaultValue={feed.person_id ?? "dorm"}
                     aria-label={`Whose calendar ${feed.label} is`}
                     className="min-w-0 flex-1 rounded-md border border-border bg-surface px-1.5 py-1 text-xs"
                   >
-                    <option value="household">The apartment</option>
+                    <option value="dorm">The Dorm</option>
                     {people.map((person) => (
                       <option key={person.id} value={person.id}>
                         {person.name}
@@ -190,13 +190,13 @@ export default async function SettingsPage({
               />
             </Field>
             <Field label="Whose is it">
-              <select name="person_id" className={fieldClass} defaultValue="household">
+              <select name="person_id" className={fieldClass} defaultValue="dorm">
                 {people.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.name}
                   </option>
                 ))}
-                <option value="household">The apartment</option>
+                <option value="dorm">The Dorm</option>
               </select>
             </Field>
             <SubmitButton>Connect</SubmitButton>

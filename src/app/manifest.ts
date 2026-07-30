@@ -15,7 +15,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Agenda",
     short_name: "Agenda",
-    description: "What the apartment has going on.",
+    description: "What the dorm has going on.",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -5,9 +5,14 @@ Context for anyone (or any session) picking this up cold.
 ## What this is
 
 A shared calendar for two roommates at Notre Dame, Indiana. It merges their
-iCloud calendars into one view and adds the household things a calendar can't
-do — rotating chores, a shared shopping list, and an apartment calendar both
-can write to.
+iCloud calendars into one view and adds the shared things a calendar can't
+do — rotating chores, a shopping list, and a dorm calendar both can write to.
+
+**The one word for the shared thing is "the dorm."** It used to be "the
+apartment" in the interface and "household" in the code, which meant two names
+for one idea; both are gone, including the `dorm_events` table. The only place
+either old word survives is `SHARED_CALENDAR_WORDS` in `colors.ts`, where they
+are names an iCloud calendar might have, not this app's vocabulary.
 
 - **Repo:** `JPLutz7/Agenda`, branch `claude/shared-roommate-calendar-0x23o9`
   (this is the repository's default branch).
@@ -41,7 +46,7 @@ Things that will bite you if you don't know them:
   `output: standalone`, `next start` boots and serves pages but silently drops
   every server action.
 - **The `events` table is a cache** rebuilt per source on each sync. Nothing
-  the user typed lives there — that's `household_events`, `chores`,
+  the user typed lives there — that's `dorm_events`, `chores`,
   `list_items`.
 
 ## How calendars work
@@ -176,7 +181,7 @@ refresh, and web push notifications.
 
 **Picking the calendar per event.** The add form carries a `calendar_id`
 select, built from `getWritableCalendars()` and pre-selected with the
-`write_calendar_id` setting that Setup still writes. `addHouseholdEvent`
+`write_calendar_id` setting that Setup still writes. `addDormEvent`
 resolves it through `getWritableCalendar()`, so a read-only or deleted
 calendar is refused rather than written to; a submission with no field at all
 falls back to the Setup default. With no CalDAV account the select isn't
@@ -194,11 +199,11 @@ sits under the grid as a disclosure, as on the Today page.
 Three different UIs for three different shapes of thing, and each one reuses
 the form that creates it rather than growing a second copy:
 
-- *Events* — `updateHouseholdEvent`. The detail dialog gains an **Edit** button
+- *Events* — `updateDormEvent`. The detail dialog gains an **Edit** button
   that swaps its body for `EventFields` in edit mode; `readEventForm` and
-  `readCalendarChoice` are shared with `addHouseholdEvent`, so the validation
-  can't drift. Only household events qualify — `CalEvent.edit` is built on the
-  server (the date and times have to be worked out in the household timezone)
+  `readCalendarChoice` are shared with `addDormEvent`, so the validation
+  can't drift. Only dorm events qualify — `CalEvent.edit` is built on the
+  server (the date and times have to be worked out in the dorm timezone)
   and is null for feed events and chores. It's also null on every day of a
   multi-day event except the first, or editing from the third day would move it.
   `EventRow` on Today links to `/calendar?view=day&date=…&edit=<id>`, which
@@ -214,14 +219,14 @@ the form that creates it rather than growing a second copy:
   re-searches — otherwise the new wording would change nothing.
 
 **Whose an item is.** `list_items.added_by` — a person id, or null for the
-apartment — set by `OwnerSelect` on both the add form and the edit form, and
-read by `readOwner()`, which maps the literal `'household'` (and anything it
+dorm — set by `OwnerSelect` on both the add form and the edit form, and
+read by `readOwner()`, which maps the literal `'dorm'` (and anything it
 can't parse) to null. Null is now the *default* on the add form; it used to be
 `people[0].id`, which meant everything Nino added without touching the picker
 came out labelled João. An unlabelled item on a shared list belongs to the
 flat, and being wrong about whose protein powder it is costs more than being
-vague. `OwnerTag` renders the apartment in `HOUSEHOLD_COLOR` rather than
-rendering nothing, so choosing "Apartment" doesn't look like a save that
+vague. `OwnerTag` renders the dorm in `DORM_COLOR` rather than
+rendering nothing, so choosing "Dorm" doesn't look like a save that
 failed.
 
 Moving an event between iCloud calendars is a create in the new one and a
@@ -233,10 +238,10 @@ behind, because only they can clear it.
 **A deleted event could come back.** `events` is a mirror of what the last sync
 saw, and a sync only rebuilds a calendar when that calendar is pulled. Removing
 an event from iCloud therefore left a stale mirror row behind — and with the
-`household_events` row that used to suppress it gone (or moved to a new UID),
+`dorm_events` row that used to suppress it gone (or moved to a new UID),
 nothing hid it any more and it reappeared as though it were an ordinary feed
 event. `forgetCachedEvent(uid)` corrects the mirror at the point of deletion,
-in both `removeHouseholdEvent` and the move path. This was found by the
+in both `removeDormEvent` and the move path. This was found by the
 Radicale test, not by reading the code.
 
 **Notifications** (`src/lib/push.ts`, `public/sw.js`, `src/components/push-setup.tsx`).
@@ -248,11 +253,11 @@ phone, nothing more.
 
 **Whose an event is, and why it's a per-calendar question.** Ownership decides
 three things at once: the colour, the label, and whether a notification goes to
-both phones or neither — apartment reminders are simply "events with no person
+both phones or neither — dorm reminders are simply "events with no person
 attached". A published feed's owner is `feeds.person_id`. A CalDAV calendar's
 comes from `caldav_calendars.owner_set` / `owner_person_id`, falling back to the
 account's person when `owner_set` is 0. That override exists because one Apple ID
-holds several calendars and they aren't all one person's: the household's shared
+holds several calendars and they aren't all one person's: the dorm's shared
 "Dorm" sits in Joao's account and is the flat's. `looksLikeSharedCalendar` in
 `colors.ts` makes such a calendar the flat's the first time it's seen — on insert
 in `sync.ts` and `connectICloudAccount`, plus a marked one-off pass in `db.ts` for
@@ -290,12 +295,12 @@ is skipped rather than guessed at — buzzing you about your own shopping is wor
 than silence.
 
 What fires: a chore due today (once per chore per day, marked in `settings`),
-**the apartment calendar's events for today** (both phones), **an apartment event
+**the dorm calendar's events for today** (both phones), **a dorm event
 added / moved / cancelled** (the other phone), a price drop of $5 or more (never
 a rise), and a list addition.
 
-**"The apartment's" events** are the ones with nobody's name on them:
-`personName === null` in `getEvents`, which covers both `household_events` and
+**"The dorm's" events** are the ones with nobody's name on them:
+`personName === null` in `getEvents`, which covers both `dorm_events` and
 any iCloud calendar Setup leaves unassigned — the shared "Dorm" calendar. A
 personal event is never announced to the flat, and there is a test for exactly
 that (two events due today, only one announced, so two sends rather than four).
@@ -329,17 +334,17 @@ is the moment you'd have seen the chore anyway, so a scheduler pointed at
   around it was grey — the single thing that most made the app look homemade.
   They're lucide components now.
 
-**Colours.** `src/lib/colors.ts` is the one place they live: the apartment is
+**Colours.** `src/lib/colors.ts` is the one place they live: the dorm is
 gold, and each person keeps their own. Nino red and João blue were applied
 once by `applyRequestedColors` in `db.ts`, which leaves a `settings` marker so
 anything changed in Setup afterwards sticks. `textOn()` picks black or white
 ink per background — white on gold is unreadable. What colour an iCloud
 account's events take comes from the person it's assigned to, changeable per
 account in Setup (`setAccountPerson`); unassigned accounts read as the
-apartment.
+dorm.
 
 **Chores on the calendar.** `getChoreEvents()` in `data.ts` turns the rotation
-into all-day entries in the apartment colour, projected forward by each
+into all-day entries in the dorm colour, projected forward by each
 chore's cadence with the assignee projected alongside — so you can see whose
 turn the bins are in a fortnight. They are *derived on read*, never stored: a
 chore's due date moves every time someone marks it done, so a written copy

@@ -53,6 +53,16 @@ function columnsOf(db: Database.Database, table: string): string[] {
     .map((c) => c.name);
 }
 
+function tableExists(db: Database.Database, table: string): boolean {
+  return (
+    db
+      .prepare<[string], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      )
+      .get(table) !== undefined
+  );
+}
+
 function migrate(db: Database.Database) {
   // Must run before the schema below. `events` gained a calendar_id column,
   // and the schema creates an index on it — against a database created by an
@@ -73,6 +83,24 @@ function migrate(db: Database.Database) {
     }
   }
 
+  // Also before the schema below, and for the same reason in reverse: the app
+  // used to call the flat "the household" and now calls it the dorm, so
+  // `household_events` becomes `dorm_events`. This has to happen before the
+  // CREATE TABLE IF NOT EXISTS further down, or that would make an empty
+  // dorm_events and the rename would then fail against it — leaving every event
+  // either of them ever added stranded in a table nothing reads.
+  //
+  // A rename rather than a copy: SQLite carries the rows, the column types and
+  // the indexes across, and there is no window where the data exists in neither
+  // place. Only fires when the old name is there and the new one isn't, so
+  // running it twice does nothing.
+  if (tableExists(db, "household_events") && !tableExists(db, "dorm_events")) {
+    db.exec("ALTER TABLE household_events RENAME TO dorm_events");
+    // The index came across under its old name and would otherwise sit beside
+    // the one the schema creates, indexing the same column twice.
+    db.exec("DROP INDEX IF EXISTS household_events_starts_idx");
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS people (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,7 +111,7 @@ function migrate(db: Database.Database) {
     );
 
     -- One published iCloud .ics URL. person_id is null for a calendar that
-    -- belongs to the household rather than to one of us.
+    -- belongs to the dorm rather than to one of us.
     CREATE TABLE IF NOT EXISTS feeds (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       person_id      INTEGER REFERENCES people(id) ON DELETE CASCADE,
@@ -122,7 +150,7 @@ function migrate(db: Database.Database) {
       -- second is the flat's. Two columns because there are three answers and
       -- a nullable id can only carry two: owner_set = 0 means "same as the
       -- account", and owner_set = 1 with a null owner_person_id means the
-      -- apartment. Everything downstream keys off the resulting person being
+      -- dorm. Everything downstream keys off the resulting person being
       -- null, so an override reaches colours, labels and notifications at once.
       owner_set       INTEGER NOT NULL DEFAULT 0,
       owner_person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
@@ -149,8 +177,8 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS events_calendar_idx ON events(calendar_id);
 
     -- Events created in the app. The iCloud feeds are read-only, so this is
-    -- how household stuff gets onto the calendar.
-    CREATE TABLE IF NOT EXISTS household_events (
+    -- how dorm stuff gets onto the calendar.
+    CREATE TABLE IF NOT EXISTS dorm_events (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       title      TEXT NOT NULL,
       notes      TEXT,
@@ -166,8 +194,8 @@ function migrate(db: Database.Database) {
       caldav_uid         TEXT,
       caldav_etag        TEXT
     );
-    CREATE INDEX IF NOT EXISTS household_events_starts_idx
-      ON household_events(starts_at);
+    CREATE INDEX IF NOT EXISTS dorm_events_starts_idx
+      ON dorm_events(starts_at);
 
     CREATE TABLE IF NOT EXISTS chores (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -291,16 +319,16 @@ function migrate(db: Database.Database) {
   // ALTER fails on a column the winner just added. Both halves of the check
   // are therefore belt and braces: skip what's there, and treat "already
   // exists" as success rather than an error.
-  const householdColumns = columnsOf(db, "household_events");
+  const dormColumns = columnsOf(db, "dorm_events");
   for (const [name, type] of [
     ["caldav_calendar_id", "INTEGER"],
     ["caldav_url", "TEXT"],
     ["caldav_uid", "TEXT"],
     ["caldav_etag", "TEXT"],
   ] as const) {
-    if (householdColumns.includes(name)) continue;
+    if (dormColumns.includes(name)) continue;
     try {
-      db.exec(`ALTER TABLE household_events ADD COLUMN ${name} ${type}`);
+      db.exec(`ALTER TABLE dorm_events ADD COLUMN ${name} ${type}`);
     } catch (err) {
       if (!/duplicate column name/i.test(String(err))) throw err;
     }
@@ -332,10 +360,10 @@ function migrate(db: Database.Database) {
     }
   }
 
-  // A calendar can now be the apartment's even when its account is someone's.
+  // A calendar can now be the dorm's even when its account is someone's.
   // The added owner_person_id carries no REFERENCES clause — SQLite can't add
   // a foreign key to an existing table — but a dangling id joins to no row and
-  // so reads as the apartment, which is what ON DELETE SET NULL would give.
+  // so reads as the dorm, which is what ON DELETE SET NULL would give.
   const calendarColumns = columnsOf(db, "caldav_calendars");
   for (const [name, type] of [
     ["owner_set", "INTEGER NOT NULL DEFAULT 0"],
@@ -357,10 +385,10 @@ function migrate(db: Database.Database) {
 /**
  * Calendars named after the flat belong to the flat.
  *
- * The household's shared calendar is called "Dorm" and it sat inside one
+ * The dorm's shared calendar is called "Dorm" and it sat inside one
  * person's Apple ID, so everything on it — the rent, the landlord, the things
  * both of them need telling about — read as that person's and was left out of
- * the apartment reminders, which go to whatever has nobody's name on it.
+ * the dorm reminders, which go to whatever has nobody's name on it.
  *
  * Names are the only signal available: a calendar's URL says nothing about what
  * it's for. So this matches on the name once, the same way the requested colours
@@ -399,7 +427,7 @@ function claimSharedCalendars(db: Database.Database) {
 }
 
 /**
- * The household asked for particular colours — red for Nino, blue for João —
+ * The dorm asked for particular colours — red for Nino, blue for João —
  * rather than the ones the palette handed out when they signed up. Names are
  * the only stable way to tell who is who; ids just record who was typed in
  * first.
@@ -466,7 +494,7 @@ function connection(): Database.Database {
  * module, in several worker processes at once, so a build would create a
  * database purely as a side effect and occasionally fail when two workers
  * migrated the same file simultaneously. Nothing about building the app should
- * touch the household's data.
+ * touch the dorm's data.
  */
 export const db: Database.Database = new Proxy({} as Database.Database, {
   get(_target, property, receiver) {

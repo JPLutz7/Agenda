@@ -1,6 +1,6 @@
 import "server-only";
 import { db, getSetting } from "./db";
-import { HOUSEHOLD_COLOR } from "./colors";
+import { DORM_COLOR } from "./colors";
 import {
   DEFAULT_TIMEZONE,
   addDays,
@@ -40,10 +40,10 @@ export type AgendaEvent = {
   allDay: boolean;
   personName: string | null;
   color: string;
-  source: "feed" | "household" | "chore";
-  householdId: number | null;
-  /** Which iCloud calendar a household event was written to, if any. */
-  householdCalendarId: number | null;
+  source: "feed" | "dorm" | "chore";
+  dormId: number | null;
+  /** Which iCloud calendar a dorm event was written to, if any. */
+  dormCalendarId: number | null;
 };
 
 export type ChoreView = {
@@ -67,7 +67,7 @@ export type ListItem = {
   text: string;
   category: ListCategory;
   checked_at: string | null;
-  /** Whose it is: a person id, or null for the apartment. */
+  /** Whose it is: a person id, or null for the dorm. */
   added_by: number | null;
   added_by_name: string | null;
   added_by_color: string | null;
@@ -179,12 +179,12 @@ export function getChoreEvents(from: DayKey, to: DayKey): AgendaEvent[] {
           endsAt: addDays(day, 1),
           allDay: true,
           personName: assignee?.name ?? null,
-          // Apartment colour: a chore belongs to the flat, whoever's turn it
+          // Dorm colour: a chore belongs to the flat, whoever's turn it
           // happens to be.
-          color: HOUSEHOLD_COLOR,
+          color: DORM_COLOR,
           source: "chore" as const,
-          householdId: null,
-          householdCalendarId: null,
+          dormId: null,
+          dormCalendarId: null,
         });
       }
       day = addDays(day, cadence);
@@ -196,7 +196,7 @@ export function getChoreEvents(from: DayKey, to: DayKey): AgendaEvent[] {
 }
 
 /**
- * Every event overlapping [from, to] — the iCloud feeds, the household
+ * Every event overlapping [from, to] — the iCloud feeds, the dorm
  * calendar, and optionally the chore rotation — merged and sorted. All-day
  * events sort first within a day, which is how a calendar is expected to read.
  */
@@ -207,7 +207,7 @@ export function getEvents(
 ): AgendaEvent[] {
   const tz = timezone();
   // Generous instant bounds — the exact day filtering happens below in the
-  // household timezone, which SQL has no notion of.
+  // dorm timezone, which SQL has no notion of.
   const lowerBound = `${addDays(from, -2)}T00:00:00.000Z`;
   const upperBound = `${addDays(to, 2)}T23:59:59.999Z`;
 
@@ -249,18 +249,18 @@ export function getEvents(
        LEFT JOIN caldav_accounts a  ON a.id  = c.account_id
        LEFT JOIN people pa          ON pa.id = a.person_id
        -- The calendar's own owner, which beats the account's when it's set.
-       -- Null with owner_set = 1 is the apartment, and reads the same as an
-       -- unassigned feed does: no name, household colour, notified to both.
+       -- Null with owner_set = 1 is the dorm, and reads the same as an
+       -- unassigned feed does: no name, dorm colour, notified to both.
        LEFT JOIN people po          ON po.id = c.owner_person_id
        WHERE e.ends_at >= ? AND e.starts_at <= ?
          AND NOT EXISTS (
-           SELECT 1 FROM household_events h
+           SELECT 1 FROM dorm_events h
            WHERE h.caldav_uid IS NOT NULL AND h.caldav_uid = e.uid
          )`,
     )
     .all(lowerBound, upperBound);
 
-  const householdRows = db
+  const dormRows = db
     .prepare<
       [string, string],
       {
@@ -274,7 +274,7 @@ export function getEvents(
       }
     >(
       `SELECT id, title, notes, starts_at, ends_at, all_day, caldav_calendar_id
-       FROM household_events
+       FROM dorm_events
        WHERE ends_at >= ? AND starts_at <= ?`,
     )
     .all(lowerBound, upperBound);
@@ -288,12 +288,12 @@ export function getEvents(
       endsAt: r.ends_at,
       allDay: r.all_day === 1,
       personName: r.person_name,
-      color: r.person_color ?? HOUSEHOLD_COLOR,
+      color: r.person_color ?? DORM_COLOR,
       source: "feed" as const,
-      householdId: null,
-      householdCalendarId: null,
+      dormId: null,
+      dormCalendarId: null,
     })),
-    ...householdRows.map((r) => ({
+    ...dormRows.map((r) => ({
       key: `h${r.id}`,
       summary: r.title,
       location: r.notes,
@@ -301,10 +301,10 @@ export function getEvents(
       endsAt: r.ends_at,
       allDay: r.all_day === 1,
       personName: null,
-      color: HOUSEHOLD_COLOR,
-      source: "household" as const,
-      householdId: r.id,
-      householdCalendarId: r.caldav_calendar_id,
+      color: DORM_COLOR,
+      source: "dorm" as const,
+      dormId: r.id,
+      dormCalendarId: r.caldav_calendar_id,
     })),
     // Off by default: the Today screen lists what's due in its own section,
     // and having each chore appear twice on one screen helps nobody.
@@ -427,7 +427,7 @@ export type CalDavCalendarView = {
   owner_person_id: number | null;
   /**
    * Whose this calendar actually reads as, account inheritance resolved. Null
-   * is the apartment — which is the same thing null means everywhere else.
+   * is the dorm — which is the same thing null means everywhere else.
    */
   owner_name: string | null;
   owner_color: string | null;

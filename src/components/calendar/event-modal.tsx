@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { removeHouseholdEvent } from "@/lib/actions";
+import { removeDormEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
 import { EventFields, type AddEventOptions } from "@/components/add-event-form";
 import type { CalEvent } from "./types";
@@ -106,7 +106,7 @@ export function EventModal({
                 </dd>
               </div>
 
-              {/* Always shown. No name means the apartment's, and saying so is
+              {/* Always shown. No name means the dorm's, and saying so is
                   more use than leaving the row out and making someone guess
                   from the colour. */}
               <div className="flex gap-3">
@@ -117,7 +117,7 @@ export function EventModal({
                     className="h-2 w-2 shrink-0 rounded-full"
                     style={{ backgroundColor: event.color }}
                   />
-                  {event.personName ?? "The apartment"}
+                  {event.personName ?? "The Dorm"}
                 </dd>
               </div>
 
@@ -133,7 +133,7 @@ export function EventModal({
               <div className="flex gap-3">
                 <dt className="w-20 shrink-0 text-muted">From</dt>
                 <dd className="min-w-0 flex-1">
-                  {event.source === "household"
+                  {event.source === "dorm"
                     ? "Added in this app"
                     : event.source === "chore"
                       ? "Chore rotation"
@@ -143,7 +143,7 @@ export function EventModal({
             </dl>
 
             <div className="mt-6 flex items-center justify-between gap-3">
-              {event.householdId !== null ? (
+              {event.dormId !== null ? (
                 <div className="flex items-center gap-3">
                   {event.edit && (
                     <button
@@ -154,7 +154,7 @@ export function EventModal({
                       Edit
                     </button>
                   )}
-                  <form action={removeHouseholdEvent.bind(null, event.householdId)}>
+                  <form action={removeDormEvent.bind(null, event.dormId)}>
                     <SubmitButton variant="danger" size="md">
                       Delete
                     </SubmitButton>

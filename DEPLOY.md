@@ -4,7 +4,7 @@ The app is a Node server with a SQLite file next to it. That shapes every
 choice here:
 
 - **It needs a persistent disk.** Vercel, Netlify and other serverless hosts
-  give you a filesystem that resets constantly — the household's data would
+  give you a filesystem that resets constantly — the dorm's data would
   vanish without warning. Don't deploy there.
 - **It needs exactly one instance.** Two instances means two SQLite files and
   two different versions of the truth, with nothing looking broken.
@@ -104,7 +104,7 @@ fly open
 > machine gets its own empty volume, and you and your roommate would silently
 > see different data depending on which machine answered. One machine, always.
 
-The first screen asks for both your names and a household passcode. Give the
+The first screen asks for both your names and a dorm passcode. Give the
 passcode to your roommate — that's the whole account system.
 
 The app's timezone already defaults to `America/Indiana/Indianapolis`, which is

@@ -2,13 +2,13 @@
  * The colours the calendar is read by.
  *
  * Whose event it is has to be obvious at a glance, at chip size, without
- * reading anything — so each person gets one colour and the apartment gets
- * its own. These live outside `data.ts` because the calendar components are
- * client-side and can't import a server-only module.
+ * reading anything — so each person gets one colour and the dorm gets its own.
+ * These live outside `data.ts` because the calendar components are client-side
+ * and can't import a server-only module.
  */
 
-/** Events belonging to the apartment rather than to either person. */
-export const HOUSEHOLD_COLOR = "#d4a017";
+/** Events belonging to the dorm rather than to either person. */
+export const DORM_COLOR = "#d4a017";
 
 /** The starting colour for each roommate, in the order they were added. */
 export const PERSON_PALETTE = [
@@ -21,7 +21,7 @@ export const PERSON_PALETTE = [
 ];
 
 /**
- * The two people in this household asked for specific colours, and names are
+ * The two people in this dorm asked for specific colours, and names are
  * the only stable way to tell them apart — ids depend on who was typed in
  * first. Applied once (see `db.ts`), so a colour changed in Setup afterwards
  * stays changed.
@@ -32,13 +32,18 @@ export const REQUESTED_COLORS: { match: string; color: string }[] = [
 ];
 
 /**
- * Calendar names that mean "the flat", not "a person".
+ * Calendar names that mean "the dorm", not "a person".
  *
- * The household's shared calendar is called "Dorm" and lives inside one
- * person's Apple ID, so without this it reads as that person's — wrong colour,
- * wrong label, and left out of the apartment reminders, which go to whatever
- * has nobody's name on it. A calendar's URL says nothing about what it's for,
- * so the name is the only signal there is.
+ * The shared calendar is called "Dorm" and lives inside one person's Apple ID,
+ * so without this it reads as that person's — wrong colour, wrong label, and
+ * left out of the dorm reminders, which go to whatever has nobody's name on it.
+ * A calendar's URL says nothing about what it's for, so the name is the only
+ * signal there is.
+ *
+ * These are names as they appear in somebody's iCloud, **not** this app's own
+ * vocabulary, which is why "apartment" and "household" are still in the list
+ * even though the app itself no longer uses either word. A calendar named
+ * either of those is still the shared one.
  *
  * Used once, when a database is first brought up to this version (see `db.ts`).
  * The pickers in Setup are the real answer and always win.

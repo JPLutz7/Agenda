@@ -5,7 +5,7 @@ import { refreshIfStale } from "@/lib/sync";
 import { notifyTodayInBackground } from "@/lib/push";
 import { addDays, formatDayLabel } from "@/lib/dates";
 import { DaySection } from "@/components/event-list";
-import { AddHouseholdEventForm } from "@/components/add-event-form";
+import { AddDormEventForm } from "@/components/add-event-form";
 import { CompleteChoreButton } from "@/components/chore-controls";
 import { PageHeader, SectionTitle } from "@/components/ui";
 
@@ -147,7 +147,7 @@ export default async function HomePage() {
         )}
 
       <div className="mt-6">
-        <AddHouseholdEventForm
+        <AddDormEventForm
           people={people}
           defaultDate={today}
           calendars={writableCalendars}

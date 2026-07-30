@@ -6,7 +6,7 @@ import {
   type DayKey,
 } from "@/lib/dates";
 import type { AgendaEvent } from "@/lib/data";
-import { removeHouseholdEvent } from "@/lib/actions";
+import { removeDormEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
 import { Dot } from "@/components/ui";
 import { Pencil, Trash2 } from "lucide-react";
@@ -47,18 +47,18 @@ export function EventRow({
           {event.allDay ? "All day" : formatTime(event.startsAt, timeZone)}
           {event.personName ? ` · ${event.personName}` : ""}
           {/* Nobody's name on it means it's the flat's, whichever calendar it
-              came from. This used to say "Apartment" only for events added in
+              came from. This used to say "Dorm" only for events added in
               the app, so an event from a shared iCloud calendar was labelled
               with nothing at all — even though it's treated as the
-              apartment's everywhere else, notifications included. */}
+              dorm's everywhere else, notifications included. */}
           {event.personName === null && event.source !== "chore"
-            ? " · Apartment"
+            ? " · Dorm"
             : ""}
           {event.source === "chore" ? " · Chore" : ""}
           {event.location ? ` · ${event.location}` : ""}
         </p>
       </div>
-      {event.source === "household" && event.householdId !== null ? (
+      {event.source === "dorm" && event.dormId !== null ? (
         <>
           {/* A link rather than a form: the editor is the calendar's dialog,
               and duplicating it into every row of every list would mean two
@@ -68,13 +68,13 @@ export function EventRow({
               event.startsAt,
               event.allDay,
               timeZone,
-            )}&edit=${event.householdId}`}
+            )}&edit=${event.dormId}`}
             title={`Edit ${event.summary}`}
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-muted hover:text-foreground"
           >
             <Pencil className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
           </Link>
-          <form action={removeHouseholdEvent.bind(null, event.householdId)}>
+          <form action={removeDormEvent.bind(null, event.dormId)}>
             <SubmitButton variant="danger" size="icon" title="Delete event">
               <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
             </SubmitButton>

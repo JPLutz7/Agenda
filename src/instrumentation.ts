@@ -9,7 +9,7 @@
  * someone opens the app rather than the first page load waiting on a fetch to
  * Apple — the on-demand refresh in lib/sync.ts stays as a safety net for the
  * case where this process has only just started. And the day's reminders —
- * chores that are due and what's on the apartment calendar — which are the
+ * chores that are due and what's on the dorm calendar — which are the
  * reason this loop exists at all rather than an external cron: a reminder that
  * only fires when somebody opens the app arrives at the exact moment they'd
  * have seen the thing anyway.

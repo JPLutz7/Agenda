@@ -175,7 +175,7 @@ export async function syncCalendar(
  * Re-read the calendar list on every connected account.
  *
  * The list is discovered when an account is first connected, but people make
- * calendars later — a shared "Apartment" one is usually created *because* they
+ * calendars later — a shared "Dorm" one is usually created *because* they
  * started using this app. Without this, a new calendar never appears and there
  * is nothing in the interface to suggest why.
  *
@@ -199,7 +199,7 @@ export async function reconcileCalendars(): Promise<void> {
       if (found.length === 0) continue;
 
       // owner_set is decided here, on the insert, and deliberately left out of
-      // the DO UPDATE: a calendar called "Dorm" starts out as the apartment's
+      // the DO UPDATE: a calendar called "Dorm" starts out as the dorm's
       // rather than as whoever owns the Apple ID it sits in, and then whatever
       // is chosen in Setup stands, however many syncs run afterwards.
       const upsert = db.prepare(
@@ -255,7 +255,7 @@ export async function syncAllFeeds(): Promise<SyncResult[]> {
     )
     .all();
 
-  // A household has a handful of calendars; fetching them together is fine.
+  // A dorm has a handful of calendars; fetching them together is fine.
   return Promise.all([
     ...feeds.map(syncFeed),
     ...calendars.map(syncCalendar),

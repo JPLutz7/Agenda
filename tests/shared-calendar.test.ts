@@ -1,18 +1,21 @@
 /**
- * Which calendar names mean "the flat".
+ * Which calendar names mean "the dorm".
  *
  * This decides whether an iCloud calendar reads as one person's or as the
- * apartment's, and being the apartment's is what puts its events in the shared
- * colour and into the reminders that go to both phones. It runs once against a
- * real database, so the rule itself is worth pinning: the risk isn't missing
- * "Dorm", it's sweeping in a calendar that only happens to contain those
- * letters.
+ * dorm's, and being the dorm's is what puts its events in the shared colour and
+ * into the reminders that go to both phones. It runs once against a real
+ * database, so the rule itself is worth pinning: the risk isn't missing "Dorm",
+ * it's sweeping in a calendar that only happens to contain those letters.
+ *
+ * The names below are how a calendar might be titled in somebody's iCloud, so
+ * "Apartment" and "Household" stay on the list even though the app no longer
+ * uses either word for itself.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { looksLikeSharedCalendar } from "../src/lib/colors.ts";
 
-test("the household's own calendar is recognised, however it's written", () => {
+test("the dorm's own calendar is recognised, however it's written", () => {
   for (const name of [
     "Dorm",
     "dorm",

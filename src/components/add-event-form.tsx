@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { addHouseholdEvent, updateHouseholdEvent } from "@/lib/actions";
+import { addDormEvent, updateDormEvent } from "@/lib/actions";
 import type { Person, WritableCalendarOption } from "@/lib/data";
 import type { EditableEvent } from "@/components/calendar/types";
 import { X } from "lucide-react";
@@ -101,7 +101,7 @@ export function EventFields({
 
   return (
     <ActionForm
-      action={existing ? updateHouseholdEvent : addHouseholdEvent}
+      action={existing ? updateDormEvent : addDormEvent}
       className="space-y-3"
       // An edit keeps what it saved on screen; only a new event clears itself
       // ready for the next one.
@@ -235,13 +235,13 @@ export function EventFields({
   );
 }
 
-/** Adding something to the apartment calendar, from a page. */
-export function AddHouseholdEventForm({
+/** Adding something to the dorm calendar, from a page. */
+export function AddDormEventForm({
   defaultDate,
   ...options
 }: AddEventOptions & { defaultDate: string }) {
   return (
-    <Disclosure summary="Add something to the apartment calendar">
+    <Disclosure summary="Add something to the dorm calendar">
       <EventFields {...options} defaultDate={defaultDate} />
     </Disclosure>
   );

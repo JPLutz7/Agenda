@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isPasscodeSet, isSignedIn } from "@/lib/auth";
-import { setupHousehold, signIn } from "@/lib/actions";
+import { setupDorm, signIn } from "@/lib/actions";
 import { ActionForm, Field, SubmitButton, fieldClass } from "@/components/forms";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +15,12 @@ export default async function LoginPage() {
       <p className="mt-1 text-sm text-muted">
         {firstRun
           ? "Set this up once, then share the passcode with your roommate."
-          : "Enter the household passcode."}
+          : "Enter the dorm passcode."}
       </p>
 
       <div className="mt-8">
         {firstRun ? (
-          <ActionForm action={setupHousehold} className="space-y-4">
+          <ActionForm action={setupDorm} className="space-y-4">
             <Field label="Your name">
               <input
                 name="name_a"
@@ -38,7 +38,7 @@ export default async function LoginPage() {
                 placeholder="Roommate"
               />
             </Field>
-            <Field label="Household passcode">
+            <Field label="Dorm passcode">
               <input
                 name="passcode"
                 type="password"
@@ -49,7 +49,7 @@ export default async function LoginPage() {
                 placeholder="At least 4 characters"
               />
             </Field>
-            <SubmitButton className="w-full">Create household</SubmitButton>
+            <SubmitButton className="w-full">Create the dorm</SubmitButton>
           </ActionForm>
         ) : (
           <ActionForm action={signIn} className="space-y-4">

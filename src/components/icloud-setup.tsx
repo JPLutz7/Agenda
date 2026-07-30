@@ -7,7 +7,7 @@ import {
   setWriteCalendar,
 } from "@/lib/actions";
 import type { CalDavAccountView, Person } from "@/lib/data";
-import { HOUSEHOLD_COLOR } from "@/lib/colors";
+import { DORM_COLOR } from "@/lib/colors";
 import {
   ActionForm,
   Disclosure,
@@ -84,7 +84,7 @@ export function ICloudSetup({
                 <span
                   aria-hidden="true"
                   className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: account.person_color ?? HOUSEHOLD_COLOR }}
+                  style={{ backgroundColor: account.person_color ?? DORM_COLOR }}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{account.label}</p>
@@ -99,7 +99,7 @@ export function ICloudSetup({
                   >
                     <select
                       name="person_id"
-                      defaultValue={account.person_id ?? "household"}
+                      defaultValue={account.person_id ?? "dorm"}
                       aria-label={`Whose account ${account.label} is`}
                       className="rounded-md border border-border bg-surface px-1.5 py-1 text-xs"
                     >
@@ -108,7 +108,7 @@ export function ICloudSetup({
                           {person.name}
                         </option>
                       ))}
-                      <option value="household">The apartment</option>
+                      <option value="dorm">The Dorm</option>
                     </select>
                     <SubmitButton variant="quiet" size="sm">
                       Save
@@ -144,7 +144,7 @@ export function ICloudSetup({
                         className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                         style={{
                           backgroundColor:
-                            calendar.owner_color ?? HOUSEHOLD_COLOR,
+                            calendar.owner_color ?? DORM_COLOR,
                         }}
                       />
                       <div className="min-w-0 flex-1">
@@ -157,7 +157,7 @@ export function ICloudSetup({
                           ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-muted">
-                          {calendar.owner_name ?? "Apartment"} ·{" "}
+                          {calendar.owner_name ?? "Dorm"} ·{" "}
                           {calendar.enabled
                             ? `${calendar.event_count} event${
                                 calendar.event_count === 1 ? "" : "s"
@@ -179,7 +179,7 @@ export function ICloudSetup({
 
                     {/* Not every calendar in one Apple ID belongs to the same
                         person. A shared "Dorm" is the flat's, and saying so is
-                        what puts it in the apartment's colour and into the
+                        what puts it in the dorm's colour and into the
                         reminders that go to both phones. */}
                     <form
                       action={setCalendarPerson.bind(null, calendar.id)}
@@ -189,7 +189,7 @@ export function ICloudSetup({
                         name="person_id"
                         defaultValue={
                           calendar.owner_set
-                            ? (calendar.owner_person_id ?? "household")
+                            ? (calendar.owner_person_id ?? "dorm")
                             : "account"
                         }
                         aria-label={`Whose calendar ${calendar.display_name} is`}
@@ -199,9 +199,9 @@ export function ICloudSetup({
                           Same as the account
                           {account.person_name
                             ? ` (${account.person_name})`
-                            : " (the apartment)"}
+                            : " (the Dorm)"}
                         </option>
-                        <option value="household">The apartment</option>
+                        <option value="dorm">The Dorm</option>
                         {people.map((person) => (
                           <option key={person.id} value={person.id}>
                             {person.name}
@@ -257,7 +257,7 @@ export function ICloudSetup({
                     {person.name}
                   </option>
                 ))}
-                <option value="household">The apartment</option>
+                <option value="dorm">The Dorm</option>
               </select>
             </Field>
             <Field label="Name it">

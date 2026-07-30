@@ -218,7 +218,7 @@ export function buildICalendar(event: OutgoingEvent): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Agenda//Shared apartment calendar//EN",
+    "PRODID:-//Agenda//Shared dorm calendar//EN",
     "CALSCALE:GREGORIAN",
     "BEGIN:VEVENT",
     `UID:${event.uid}`,

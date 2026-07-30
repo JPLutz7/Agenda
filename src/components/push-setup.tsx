@@ -154,7 +154,7 @@ export function PushSetup({
       await subscription?.unsubscribe();
       // The server row is left for the Devices list below to remove, so
       // "turned it off here" and "stop sending to this phone" stay separate
-      // acts — one is this browser's business, the other is the household's.
+      // acts — one is this browser's business, the other is the dorm's.
       setState({ kind: "off" });
     } catch (err) {
       setState({

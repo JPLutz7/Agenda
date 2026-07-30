@@ -7,7 +7,7 @@
  *
  * 1. An all-day value is a bare date string and must never become a timestamp.
  *    That conversion is how "July 4th" ends up displaying as July 3rd.
- * 2. A wall-clock time typed by a person means that time *in the household's
+ * 2. A wall-clock time typed by a person means that time *in the dorm's
  *    zone*, on the day in question, daylight saving included.
  *
  * The daylight-saving dates used below are the real ones for 2026 in US

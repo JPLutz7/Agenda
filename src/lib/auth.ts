@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { getSetting, setSetting } from "./db";
 
 /**
- * Authentication for a household of two.
+ * Authentication for a dorm of two.
  *
  * One shared passcode, stored scrypt-hashed, exchanged for a signed cookie.
  * There are no user accounts to manage because there are no users to manage —

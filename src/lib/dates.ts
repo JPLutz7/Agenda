@@ -12,7 +12,7 @@
 export type DayKey = string; // 'YYYY-MM-DD'
 
 /**
- * The timezone the apartment lives in. One place, one answer.
+ * The timezone the dorm lives in. One place, one answer.
  *
  * Notre Dame is in St. Joseph County, which is Eastern and observes DST.
  * Indiana is not uniform about this — the northwest corner of the state runs

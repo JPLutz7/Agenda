@@ -7,7 +7,7 @@ import {
   groupByDay,
   timezone,
 } from "@/lib/data";
-import { HOUSEHOLD_COLOR } from "@/lib/colors";
+import { DORM_COLOR } from "@/lib/colors";
 import { refreshIfStale } from "@/lib/sync";
 import {
   addDays,
@@ -150,23 +150,23 @@ export default async function CalendarPage({
       ),
       dateLabel: formatFullDate(day),
       source: event.source,
-      householdId: event.householdId,
+      dormId: event.dormId,
       // Only events this app created can be edited, and only from the day
       // they start on — the grid repeats a multi-day event on each of its
       // days, and prefilling the form from the third of those would move it.
       edit:
-        event.householdId !== null && day === eventDayKey(event.startsAt, event.allDay, tz)
+        event.dormId !== null && day === eventDayKey(event.startsAt, event.allDay, tz)
           ? {
-              id: event.householdId,
+              id: event.dormId,
               title: event.summary,
-              // A household event's "location" is its notes; nothing else
+              // A dorm event's "location" is its notes; nothing else
               // fills that column for them.
               notes: event.location ?? "",
               date: day,
               startTime: event.allDay ? "" : clockValue(startMinutes),
               endTime: event.allDay ? "" : clockValue(endMinutes),
               allDay: event.allDay,
-              calendarId: event.householdCalendarId,
+              calendarId: event.dormCalendarId,
             }
           : null,
     };
@@ -272,9 +272,9 @@ export default async function CalendarPage({
           <li className="flex items-center gap-1.5">
             <span
               className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: HOUSEHOLD_COLOR }}
+              style={{ backgroundColor: DORM_COLOR }}
             />
-            Apartment
+            Dorm
           </li>
         </ul>
       )}

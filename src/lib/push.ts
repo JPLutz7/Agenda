@@ -285,7 +285,7 @@ export async function notifyChoresDue(): Promise<number> {
 }
 
 /**
- * The morning window, in household-local hours, that the server's own loop is
+ * The morning window, in dorm-local hours, that the server's own loop is
  * allowed to send the day's reminders in.
  *
  * Both ends matter. Without a floor the reminder goes out on the first tick
@@ -301,11 +301,11 @@ const REMINDER_UNTIL_HOUR = 21;
 
 /**
  * The day's reminders, sent on the server's own schedule rather than because
- * somebody opened the app: chores that are due, and what's on the apartment
+ * somebody opened the app: chores that are due, and what's on the dorm
  * calendar.
  *
  * Called from the background loop in `instrumentation.ts`, which ticks every
- * ten minutes, so the notifications land between 8:00 and 8:10 household time.
+ * ten minutes, so the notifications land between 8:00 and 8:10 dorm time.
  * The per-item-per-day markers inside the two functions are what keep the other
  * 77 ticks of the day silent — this function deliberately holds no state of its
  * own.
@@ -316,21 +316,21 @@ export async function notifyDueThisMorning(): Promise<number> {
   if (hour < REMINDER_FROM_HOUR || hour >= REMINDER_UNTIL_HOUR) return 0;
   const [chores, events] = await Promise.all([
     notifyChoresDue(),
-    notifyApartmentEventsToday(),
+    notifyDormEventsToday(),
   ]);
   return chores + events;
 }
 
 /**
- * What's on the apartment calendar today.
+ * What's on the dorm calendar today.
  *
- * The flat's own events, told to both phones — a landlord visit or the rent
- * going out isn't one person's business, which is what makes it an apartment
- * event rather than someone's.
+ * The dorm's own events, told to both phones — a landlord visit or the rent
+ * going out isn't one person's business, which is what makes it a dorm event
+ * rather than someone's.
  *
- * "The apartment's" means any event with nobody's name on it: the ones added in
- * this app, and anything in an iCloud calendar that Setup leaves unassigned —
- * the shared "Dorm" calendar, typically. Both read as the flat's in every other
+ * "The dorm's" means any event with nobody's name on it: the ones added in
+ * this app, and anything in an iCloud calendar marked as the dorm's — the
+ * shared "Dorm" calendar, typically. Both read the same way on every other
  * screen, so both belong here.
  *
  * The marker is keyed by what the event *is*, not by its row id. Feed rows are
@@ -338,7 +338,7 @@ export async function notifyDueThisMorning(): Promise<number> {
  * underneath us — keying on one would send the same reminder again after a
  * refresh.
  */
-export async function notifyApartmentEventsToday(): Promise<number> {
+export async function notifyDormEventsToday(): Promise<number> {
   const tz = timezone();
   const day = today(tz);
 
@@ -361,7 +361,7 @@ export async function notifyApartmentEventsToday(): Promise<number> {
     const report = await notifyEveryone({
       title: event.summary,
       body: event.allDay
-        ? "On the apartment calendar today."
+        ? "On the dorm calendar today."
         : `Today at ${formatTime(event.startsAt, tz)}.`,
       url: "/",
       tag: `event-${identity}`,
@@ -382,7 +382,7 @@ let inFlight: Promise<unknown> | null = null;
  */
 export function notifyTodayInBackground(): void {
   if (inFlight) return;
-  inFlight = Promise.all([notifyChoresDue(), notifyApartmentEventsToday()])
+  inFlight = Promise.all([notifyChoresDue(), notifyDormEventsToday()])
     .catch(() => undefined)
     .finally(() => {
       inFlight = null;

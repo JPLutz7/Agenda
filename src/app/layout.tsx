@@ -5,7 +5,7 @@ import { LiveRefresh } from "@/components/live-refresh";
 
 export const metadata: Metadata = {
   title: "Agenda",
-  description: "What the apartment has going on.",
+  description: "What the dorm has going on.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Agenda", statusBarStyle: "default" },
   icons: {

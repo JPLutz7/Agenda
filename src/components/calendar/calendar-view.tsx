@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   AddEventDialog,
-  AddHouseholdEventForm,
+  AddDormEventForm,
   type AddEventOptions,
 } from "@/components/add-event-form";
 import { EventModal } from "./event-modal";
@@ -61,7 +61,7 @@ export function CalendarView({
   /** 'Tuesday, July 28, 2026' for each day on screen, keyed by day. */
   dayLabels: Record<string, string>;
   /**
-   * A household event to open straight into its edit form, from `?edit=` —
+   * A dorm event to open straight into its edit form, from `?edit=` —
    * how the Today screen's pencil gets you here without a second tap.
    */
   editId: number | null;
@@ -205,7 +205,7 @@ export function CalendarView({
 
       {scale !== "year" && (
         <div className="mt-5">
-          <AddHouseholdEventForm {...addOptions} defaultDate={anchor} />
+          <AddDormEventForm {...addOptions} defaultDate={anchor} />
         </div>
       )}
 

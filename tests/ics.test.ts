@@ -149,7 +149,7 @@ test("an all-day repeat lands on its own day, not the day before", () => {
     assert.equal(
       eventDayKey(occurrence.startsAt, true, TZ),
       occurrence.startsAt,
-      "an all-day date must never shift when read back in the household zone",
+      "an all-day date must never shift when read back in the dorm zone",
     );
   }
 });

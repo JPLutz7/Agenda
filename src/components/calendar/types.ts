@@ -1,7 +1,7 @@
 /**
  * One event, prepared for display.
  *
- * Every label is worked out on the server, where the household timezone
+ * Every label is worked out on the server, where the dorm timezone
  * lives. The calendar components do no date arithmetic — they position
  * things using the minute offsets and print the strings they're handed.
  */
@@ -25,13 +25,13 @@ export type CalEvent = {
   rangeLabel: string;
   /** 'Tuesday, July 28, 2026'. */
   dateLabel: string;
-  source: "feed" | "household" | "chore";
+  source: "feed" | "dorm" | "chore";
   /** Set only for events this app created, which it can also delete. */
-  householdId: number | null;
+  dormId: number | null;
   /**
    * The same event as the add form's own fields, for editing it in place.
    * Null for anything this app doesn't own. Built on the server because the
-   * date and the times have to be worked out in the household timezone.
+   * date and the times have to be worked out in the dorm timezone.
    */
   edit: EditableEvent | null;
 };
@@ -40,7 +40,7 @@ export type EditableEvent = {
   id: number;
   title: string;
   notes: string;
-  /** 'YYYY-MM-DD' in the household timezone. */
+  /** 'YYYY-MM-DD' in the dorm timezone. */
   date: string;
   /** 'HH:MM', blank for an all-day event. */
   startTime: string;

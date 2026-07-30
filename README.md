@@ -1,8 +1,8 @@
 # Agenda
 
-A shared calendar for an apartment. It pulls in everyone's published iCloud
-calendars, merges them into one view, and adds the household things a calendar
-app can't do — chores that rotate, a shopping list, and an apartment calendar
+A shared calendar for a dorm. It pulls in everyone's published iCloud
+calendars, merges them into one view, and adds the shared things a calendar
+app can't do — chores that rotate, a shopping list, and a dorm calendar
 you both write to.
 
 Built for two people sharing a place. It works with more, but it isn't trying
@@ -12,15 +12,15 @@ to be a product.
 
 - **One merged calendar.** Everyone's iCloud events, colour-coded by person, in
   a day agenda and a week view.
-- **An apartment calendar.** Things that belong to the flat rather than to one
+- **A dorm calendar.** Things that belong to the flat rather than to one
   person — landlord visits, rent, a party — added in the app.
 - **Chores that rotate.** Set a chore and a cadence. Marking it done passes the
   turn to the other person and records who did it last.
-- **Notifications.** A chore on the day it's yours, what's on the apartment
+- **Notifications.** A chore on the day it's yours, what's on the dorm
   calendar today, a price drop worth knowing about, and anything your roommate
-  adds to the list or puts on the apartment calendar.
+  adds to the list or puts on the dorm calendar.
 - **A shopping list.** Anyone adds, anyone ticks off. Each thing on it belongs
-  to the apartment or to one person, colour-coded the same way the calendar is,
+  to the dorm or to one person, colour-coded the same way the calendar is,
   and that can be changed later — the washing-up liquid is everyone's, the
   protein powder isn't.
 
@@ -44,7 +44,7 @@ npm run dev          # http://localhost:3000
 npm test             # the date, recurrence, price and layout tests
 ```
 
-The first page asks for both names and a household passcode. There are no user
+The first page asks for both names and a dorm passcode. There are no user
 accounts — one passcode, shared between the people who live there.
 
 Data goes in `./data/agenda.db` (SQLite). Set `AGENDA_DB_PATH` to move it.
@@ -93,7 +93,7 @@ is more than ten minutes old.
 Two things to know before you publish one:
 
 - **A published iCloud calendar is readable by anyone with the link.** It's a
-  long random URL, not a password. That's fine for an apartment calendar; think
+  long random URL, not a password. That's fine for a dorm calendar; think
   about it before publishing a personal one. To share only some events, make a
   second calendar in iCloud and publish that instead.
 - **It's read-only, in both directions.** Events added in Agenda don't appear
@@ -112,7 +112,7 @@ Two things to know before you publish one:
 | `BESTBUY_API_BASE` | `https://api.bestbuy.com/v1` | Overrides the API host, for testing against a stand-in. |
 | `AGENDA_SCRAPE_BASE` | unset | Rewrites the host of every product link before fetching, so the price-reading path can be tested against a local page. **Testing only** — it also exempts that host from the private-address check. |
 
-Set the household timezone in **Setup**. Every day boundary and chore due date
+Set the dorm timezone in **Setup**. Every day boundary and chore due date
 is worked out in it.
 
 ### Notifications
@@ -128,15 +128,15 @@ way "your roommate added this" can avoid being sent to the roommate who added it
 What arrives:
 
 - **Chores due today**, to whoever's turn it is. Once per chore per day.
-- **The apartment calendar's events for today**, to both phones. "The
-  apartment's" means anything with nobody's name on it — added in this app, or
+- **The dorm calendar's events for today**, to both phones. "The
+  dorm's" means anything with nobody's name on it — added in this app, or
   in an iCloud calendar Setup leaves unassigned. Personal events are never
   announced to the flat.
-- **Apartment events added, moved or cancelled**, to whoever didn't do it.
+- **Dorm events added, moved or cancelled**, to whoever didn't do it.
 - **A price drop of $5 or more** on the Wants list. Never a rise.
 - **Anything added to the shopping list**, to the other person.
 
-The day's reminders go out shortly after 8:00 household time, from the server's
+The day's reminders go out shortly after 8:00 dorm time, from the server's
 own background loop — no external scheduler needed. The loop ticks every ten
 minutes and only sends between 8:00 and 21:00: without a floor a restart just
 after midnight would buzz about a day that has barely started, and without a
@@ -230,7 +230,7 @@ as July 3rd for half the world. See `src/lib/dates.ts`.
 
 - **Two-way sync via CalDAV.** iCloud speaks CalDAV at `caldav.icloud.com` with
   an app-specific password, which would let the app write to your real
-  calendars. Workable for a household, but it means storing each person's
+  calendars. Workable for a dorm, but it means storing each person's
   app-specific password — a real trade-off rather than a free upgrade.
 - **Shared expenses.** Nothing is built; the schema has room for it.
 - **Push notifications** for a chore coming due, via web push.

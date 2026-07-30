@@ -24,7 +24,7 @@ primary_region = "ord"
   # with both phones still showing as registered. Change this if the app moves.
   AGENDA_PUBLIC_URL = "https://agenda-nd.fly.dev"
 
-# The household's data. Without this the SQLite file lives in the container's
+# The dorm's data. Without this the SQLite file lives in the container's
 # temporary filesystem and every deploy wipes it.
 [[mounts]]
   source = "agenda_data"
