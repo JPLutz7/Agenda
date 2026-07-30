@@ -15,7 +15,7 @@ import {
   SubmitButton,
   fieldClass,
 } from "@/components/forms";
-import { Card, Empty } from "@/components/ui";
+import { Card, Empty, OwnerTile } from "@/components/ui";
 import { Trash2 } from "lucide-react";
 
 export function ICloudSetup({
@@ -81,10 +81,9 @@ export function ICloudSetup({
               className="overflow-hidden rounded-xl border border-border bg-surface"
             >
               <div className="flex items-start gap-3 border-b border-border px-4 py-3">
-                <span
-                  aria-hidden="true"
-                  className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: account.person_color ?? DORM_COLOR }}
+                <OwnerTile
+                  color={account.person_color ?? DORM_COLOR}
+                  name={account.person_name}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{account.label}</p>
@@ -139,13 +138,9 @@ export function ICloudSetup({
                 {account.calendars.map((calendar) => (
                   <li key={calendar.id} className="px-4 py-2.5">
                     <div className="flex items-start gap-3">
-                      <span
-                        aria-hidden="true"
-                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor:
-                            calendar.owner_color ?? DORM_COLOR,
-                        }}
+                      <OwnerTile
+                        color={calendar.owner_color ?? DORM_COLOR}
+                        name={calendar.owner_name}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm">

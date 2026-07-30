@@ -1,5 +1,4 @@
 import type { Person } from "@/lib/data";
-import { DORM_COLOR } from "@/lib/colors";
 
 /**
  * Whose item this is: the dorm, or one of the people in it.
@@ -41,23 +40,7 @@ export function OwnerSelect({
   );
 }
 
-/**
- * The little coloured name on a row. The dorm gets one too — without it,
- * choosing "Dorm" would look like the choice hadn't been saved.
- */
-export function OwnerTag({
-  name,
-  color,
-}: {
-  name: string | null;
-  color: string | null;
-}) {
-  return (
-    <span
-      className="shrink-0 text-xs font-medium"
-      style={{ color: name ? (color ?? undefined) : DORM_COLOR }}
-    >
-      {name ?? "Dorm"}
-    </span>
-  );
-}
+// `OwnerTag` — the owner's name in coloured text at the end of a row — used to
+// live here. Every screen now leads its rows with `OwnerTile` from
+// `components/ui` instead, so the same fact isn't shown two different ways in
+// two halves of the app.

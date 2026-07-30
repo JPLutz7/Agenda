@@ -6,10 +6,10 @@ import {
   toggleListItem,
 } from "@/lib/actions";
 import type { ListItem, Person } from "@/lib/data";
+import { DORM_COLOR } from "@/lib/colors";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Empty, listClass } from "@/components/ui";
+import { Empty, OwnerTile, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
-import { OwnerTag } from "./owner";
 import { money, shopLabel, sinceLabel } from "./money";
 import { ArrowDown, ArrowUp, Check, Trash2, TriangleAlert } from "lucide-react";
 
@@ -88,13 +88,16 @@ export function Wants({
                 className="overflow-hidden rounded-xl border border-border bg-surface"
               >
                 <div className="flex items-start gap-3 p-3">
+                  {/* Leading the row, as on every other screen. It used to be
+                      the owner's name in coloured text off to the right of the
+                      title, which is a different pattern for the same fact. */}
+                  <OwnerTile
+                    color={item.added_by_color ?? DORM_COLOR}
+                    name={item.added_by_name}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="min-w-0 text-sm font-medium">{item.text}</p>
-                      <OwnerTag
-                        name={item.added_by_name}
-                        color={item.added_by_color}
-                      />
                     </div>
                     {item.retailer_name && (
                       <p className="mt-0.5 truncate text-xs text-muted">

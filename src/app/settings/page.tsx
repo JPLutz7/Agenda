@@ -12,6 +12,7 @@ import { ICloudSetup } from "@/components/icloud-setup";
 import { PushSetup } from "@/components/push-setup";
 import { ThemePicker } from "@/components/theme-picker";
 import { getTheme } from "@/lib/theme";
+import { DORM_COLOR } from "@/lib/colors";
 import {
   addFeed,
   addPerson,
@@ -33,7 +34,14 @@ import {
   SubmitButton,
   fieldClass,
 } from "@/components/forms";
-import { Card, Empty, PageHeader, SectionTitle, listClass } from "@/components/ui";
+import {
+  Card,
+  Empty,
+  OwnerTile,
+  PageHeader,
+  SectionTitle,
+  listClass,
+} from "@/components/ui";
 import { Trash2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -113,10 +121,9 @@ export default async function SettingsPage({
         <ul className={listClass}>
           {feeds.map((feed) => (
             <li key={feed.id} className="flex items-start gap-3 px-4 py-3">
-              <span
-                aria-hidden="true"
-                className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: feed.person_color ?? "#6b7280" }}
+              <OwnerTile
+                color={feed.person_color ?? DORM_COLOR}
+                name={feed.person_name}
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{feed.label}</p>

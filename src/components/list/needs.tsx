@@ -4,10 +4,10 @@ import {
   toggleListItem,
 } from "@/lib/actions";
 import type { ListItem, Person } from "@/lib/data";
+import { DORM_COLOR } from "@/lib/colors";
 import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
-import { Empty, listClass } from "@/components/ui";
+import { Empty, OwnerTile, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
-import { OwnerTag } from "./owner";
 import { money } from "./money";
 import { Check, Trash2 } from "lucide-react";
 
@@ -54,6 +54,13 @@ export function Needs({
                   className="flex w-full items-center gap-3 px-2 py-2 text-left"
                 >
                   <span className="h-4 w-4 shrink-0 rounded border border-muted" />
+                  {/* Same tile, same place, as on Today and Chores — this
+                      screen was still naming the owner in coloured text on the
+                      far side of the row, which read as a different app. */}
+                  <OwnerTile
+                    color={item.added_by_color ?? DORM_COLOR}
+                    name={item.added_by_name}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">{item.text}</span>
                     {item.last_price_cents !== null && (
@@ -62,10 +69,6 @@ export function Needs({
                       </span>
                     )}
                   </span>
-                  <OwnerTag
-                    name={item.added_by_name}
-                    color={item.added_by_color}
-                  />
                 </button>
               </form>
               <EditItemLink item={item} tab="needs" />
