@@ -8,7 +8,6 @@ import {
 import type { AgendaEvent } from "@/lib/data";
 import { removeDormEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
-import { Dot } from "@/components/ui";
 import { Pencil, Trash2 } from "lucide-react";
 
 export function EventRow({
@@ -27,39 +26,55 @@ export function EventRow({
   next?: boolean;
   now?: boolean;
 }) {
+  // Nobody's name on it means it's the dorm's, whichever calendar it came from.
+  // This used to be said only for events added in the app, so one from a shared
+  // iCloud calendar was labelled with nothing at all — even though it's treated
+  // as the dorm's everywhere else, notifications included.
+  const whose = [
+    event.personName,
+    event.personName === null && event.source !== "chore" ? "Dorm" : null,
+    event.source === "chore" ? "Chore" : null,
+    event.location,
+  ].filter(Boolean);
+
   return (
     <li
-      className={`flex items-start gap-3 px-4 py-3 ${
+      className={`flex items-stretch gap-3 px-4 py-3 ${
         past ? "opacity-45" : ""
       } ${next || now ? "bg-accent/5" : ""}`}
     >
-      <Dot color={event.color} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {event.summary}
-          {(now || next) && (
-            <span className="ml-2 align-middle rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
-              {now ? "now" : "next"}
-            </span>
-          )}
-        </p>
-        <p className="mt-0.5 text-xs text-muted">
+      {/* The time reads down the left edge, so a day can be scanned by when
+          rather than by what — and the title gets the rest of the row instead
+          of being cut off at half width to make room for it. */}
+      <div className="w-[3.75rem] shrink-0 pt-px text-right">
+        <span
+          className={`text-xs font-medium tabular-nums ${
+            now || next ? "text-accent" : "text-muted"
+          }`}
+        >
           {event.allDay ? "All day" : formatTime(event.startsAt, timeZone)}
-          {event.personName ? ` · ${event.personName}` : ""}
-          {/* Nobody's name on it means it's the flat's, whichever calendar it
-              came from. This used to say "Dorm" only for events added in
-              the app, so an event from a shared iCloud calendar was labelled
-              with nothing at all — even though it's treated as the
-              dorm's everywhere else, notifications included. */}
-          {event.personName === null && event.source !== "chore"
-            ? " · Dorm"
-            : ""}
-          {event.source === "chore" ? " · Chore" : ""}
-          {event.location ? ` · ${event.location}` : ""}
-        </p>
+        </span>
+      </div>
+      <span
+        aria-hidden="true"
+        className="w-[3px] shrink-0 rounded-full"
+        style={{ backgroundColor: event.color }}
+      />
+      <div className="min-w-0 flex-1">
+        {/* Wraps rather than truncating. An entry whose whole point is its name
+            is not improved by hiding half of it. The "now"/"next" badges that
+            used to sit here are gone: the headline at the top of Today says
+            which is which, in bigger type, without repeating the title. */}
+        <p className="text-sm font-medium leading-snug">{event.summary}</p>
+        {whose.length > 0 && (
+          <p className="mt-0.5 text-xs text-muted">{whose.join(" · ")}</p>
+        )}
       </div>
       {event.source === "dorm" && event.dormId !== null ? (
-        <>
+        // Quieter than they were, and closer together: two 36px slabs on the
+        // right of every row competed with the words for attention and cost the
+        // title a third of its width. They only need to be findable, not seen.
+        <div className="-mr-1 flex shrink-0 items-start self-start">
           {/* A link rather than a form: the editor is the calendar's dialog,
               and duplicating it into every row of every list would mean two
               of them to keep in step. */}
@@ -70,16 +85,21 @@ export function EventRow({
               timeZone,
             )}&edit=${event.dormId}`}
             title={`Edit ${event.summary}`}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-muted hover:text-foreground"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted/60 transition hover:bg-surface-muted hover:text-foreground"
           >
-            <Pencil className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+            <Pencil className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
           </Link>
           <form action={removeDormEvent.bind(null, event.dormId)}>
-            <SubmitButton variant="danger" size="icon" title="Delete event">
-              <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+            <SubmitButton
+              variant="danger"
+              size="icon"
+              title="Delete event"
+              className="h-7 w-7 rounded-md text-muted/60"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
             </SubmitButton>
           </form>
-        </>
+        </div>
       ) : null}
     </li>
   );
@@ -117,29 +137,37 @@ export function DaySection({
     ? undefined
     : events.find((event) => timed(event) && event.startsAt > nowIso!)?.key;
 
+  // An empty day is one word of information, so it gets one line rather than a
+  // dashed box the size of a real entry. It used to take up as much room as
+  // something you actually had to do.
+  if (events.length === 0) {
+    return (
+      <section className="mb-4 flex items-baseline gap-3 px-1">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          {formatDayLabel(day, timeZone)}
+        </h2>
+        <p className="text-xs text-muted/70">Nothing scheduled</p>
+      </section>
+    );
+  }
+
   return (
     <section className="mb-4">
       <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
         {formatDayLabel(day, timeZone)}
       </h2>
-      {events.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border px-4 py-4 text-sm text-muted">
-          Nothing scheduled.
-        </p>
-      ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-          {events.map((event) => (
-            <EventRow
-              key={event.key}
-              event={event}
-              timeZone={timeZone}
-              past={isOver(event)}
-              now={event.key === underwayKey}
-              next={event.key === nextKey}
-            />
-          ))}
-        </ul>
-      )}
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        {events.map((event) => (
+          <EventRow
+            key={event.key}
+            event={event}
+            timeZone={timeZone}
+            past={isOver(event)}
+            now={event.key === underwayKey}
+            next={event.key === nextKey}
+          />
+        ))}
+      </ul>
     </section>
   );
 }

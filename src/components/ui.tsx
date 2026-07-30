@@ -68,9 +68,15 @@ export function SectionTitle({ children }: { children: ReactNode }) {
  * glance. `color-mix` does the blending against whatever surface is behind it,
  * so the same rule works in both light and dark.
  */
-export function tintedBlock(color: string): React.CSSProperties {
+export function tintedBlock(
+  color: string,
+  /** "strong" is for a single large block, not for rows in a list. */
+  strength: "normal" | "strong" = "normal",
+): React.CSSProperties {
+  const amount =
+    strength === "strong" ? "var(--tint-strong)" : "var(--tint-strength)";
   return {
-    background: `color-mix(in srgb, ${color} var(--tint-strength), var(--color-surface))`,
+    background: `color-mix(in srgb, ${color} ${amount}, var(--color-surface))`,
     // The solid edge is what survives at chip size, when the tint is too small
     // an area to read as a colour at all.
     borderInlineStart: `3px solid ${color}`,
@@ -85,13 +91,6 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
-/** A person's color, as a dot. */
-export function Dot({ color }: { color: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-      style={{ backgroundColor: color }}
-    />
-  );
-}
+// The `Dot` that used to live here is gone: event rows now carry a full-height
+// colour bar instead, which reads as whose-it-is at a glance where a 8px circle
+// only read as decoration.

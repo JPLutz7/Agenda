@@ -6,7 +6,10 @@ import { notifyTodayInBackground } from "@/lib/push";
 import { addDays, formatDayLabel } from "@/lib/dates";
 import { DaySection } from "@/components/event-list";
 import { AddDormEventForm } from "@/components/add-event-form";
-import { CompleteChoreButton } from "@/components/chore-controls";
+import { CompleteChoreTick } from "@/components/chore-controls";
+import { HeadlineBlock } from "@/components/headline";
+import { buildHeadline } from "@/lib/headline";
+import { DORM_COLOR } from "@/lib/colors";
 import { PageHeader, SectionTitle } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +63,17 @@ export default async function HomePage() {
     (d, i) => i < 2 || d.events.length > 0,
   );
 
+  // The line that answers the question the screen exists for. Chores come in
+  // only as a fallback, since a calendar event is the more time-sensitive of
+  // the two — a chore is due all day, a landlord is at the door at 4:30.
+  const headline = buildHeadline({
+    events: days[0]?.events ?? [],
+    chores: dueNow,
+    nowIso,
+    timeZone: timezone,
+    dormColor: DORM_COLOR,
+  });
+
   return (
     <>
       <PageHeader
@@ -98,17 +112,29 @@ export default async function HomePage() {
         </div>
       )}
 
+      <HeadlineBlock headline={headline} />
+
       {dueNow.length > 0 && (
         <>
           <SectionTitle>Needs doing</SectionTitle>
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
             {dueNow.map((chore) => (
-              <li
-                key={chore.id}
-                className="flex items-center gap-3 px-4 py-3"
-              >
+              <li key={chore.id} className="flex items-stretch gap-3 px-4 py-3">
+                <CompleteChoreTick choreId={chore.id} title={chore.title} />
+                {/* Whose turn it is, in the same place and shape as an event
+                    row's colour: tick, bar, words. On the right it read as a
+                    scrollbar rather than as a person. */}
+                <span
+                  aria-hidden="true"
+                  className="w-[3px] shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: chore.assignee?.color ?? "transparent",
+                  }}
+                />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{chore.title}</p>
+                  <p className="text-sm font-medium leading-snug">
+                    {chore.title}
+                  </p>
                   <p className="mt-0.5 text-xs">
                     <span className={chore.overdue ? "text-red-500" : "text-muted"}>
                       {chore.dueLabel}
@@ -118,7 +144,6 @@ export default async function HomePage() {
                     )}
                   </p>
                 </div>
-                <CompleteChoreButton choreId={chore.id} />
               </li>
             ))}
           </ul>

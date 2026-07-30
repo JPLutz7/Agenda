@@ -32,6 +32,10 @@
      it at a glance, little enough that the title stays the darkest thing in
      it. Solid blocks were legible but read as a wall of paint. */
   --tint-strength: 14%;
+  /* The headline at the top of Today is the one place colour is allowed to be
+     loud — it's a single block, so it can carry more of it without the page
+     turning into a wall of paint. */
+  --tint-strong: 24%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +49,7 @@
     --accent: #60a5fa;
     /* Dark surfaces swallow a tint, so it takes a little more of it. */
     --tint-strength: 26%;
+    --tint-strong: 40%;
   }
 }
 

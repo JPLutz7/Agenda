@@ -11,7 +11,7 @@ import {
   fieldClass,
 } from "@/components/forms";
 import {
-  CompleteChoreButton,
+  CompleteChoreTick,
   RemoveChoreButton,
   SnoozeChoreButton,
 } from "@/components/chore-controls";
@@ -39,9 +39,21 @@ export default async function ChoresPage() {
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
           {chores.map((chore) => (
             <li key={chore.id} className="px-4 py-3">
-            <div className="flex items-center gap-2">
+            {/* Tick, colour, words — the same row shape as an event, so the two
+                lists read as one app. The title used to be truncated to make
+                room for three buttons and an Edit link on a fourth line, which
+                is a lot of furniture around "take the bins out". */}
+            <div className="flex items-stretch gap-3">
+              <CompleteChoreTick choreId={chore.id} title={chore.title} />
+              <span
+                aria-hidden="true"
+                className="w-[3px] shrink-0 rounded-full"
+                style={{
+                  backgroundColor: chore.assignee?.color ?? "transparent",
+                }}
+              />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{chore.title}</p>
+                <p className="text-sm font-medium leading-snug">{chore.title}</p>
                 <p className="mt-0.5 text-xs">
                   {chore.assignee ? (
                     <span
@@ -72,19 +84,24 @@ export default async function ChoresPage() {
                   </p>
                 )}
               </div>
-              <SnoozeChoreButton choreId={chore.id} />
-              <CompleteChoreButton choreId={chore.id} />
-              <RemoveChoreButton choreId={chore.id} />
             </div>
 
             {/* Folded away rather than on another screen: a chore is four
                 fields, and the point of editing one is usually to see it next
-                to the others while you change it. */}
-            <details className="group mt-1">
+                to the others while you change it. The rarely-wanted controls —
+                push it back a day, delete it — live in here too now, so they
+                cost the row nothing until they're asked for. */}
+            {/* Indented to line up with the title above it, not with the tick:
+                24px tick + 12px gap + 3px bar + 12px gap. */}
+            <details className="group mt-1 pl-[3.1875rem]">
               <summary className="cursor-pointer list-none py-1 text-xs font-medium text-accent">
                 <span className="group-open:hidden">Edit</span>
                 <span className="hidden group-open:inline">Cancel</span>
               </summary>
+              <div className="mt-2 flex items-center gap-2">
+                <SnoozeChoreButton choreId={chore.id} />
+                <RemoveChoreButton choreId={chore.id} />
+              </div>
               <ActionForm
                 action={updateChore}
                 className="mt-2 space-y-3 rounded-lg border border-border bg-surface-muted p-3"

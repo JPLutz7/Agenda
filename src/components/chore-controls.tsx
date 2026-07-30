@@ -1,13 +1,26 @@
 import { completeChore, removeChore, snoozeChore } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
+import { TickButton } from "@/components/tick-button";
 import { Trash2 } from "lucide-react";
 
-export function CompleteChoreButton({ choreId }: { choreId: number }) {
+/**
+ * Marking a chore done, as a tick box.
+ *
+ * It was a grey "Done" slab on the right of every row, which made three chores
+ * read as three buttons with some text beside them. A circle on the left is the
+ * shape everyone already knows for "not done yet", it sits where the eye starts
+ * rather than where it ends, and it leaves the row's full width to the words.
+ */
+export function CompleteChoreTick({
+  choreId,
+  title,
+}: {
+  choreId: number;
+  title: string;
+}) {
   return (
-    <form action={completeChore.bind(null, choreId)}>
-      <SubmitButton variant="quiet" size="sm">
-        Done
-      </SubmitButton>
+    <form action={completeChore.bind(null, choreId)} className="shrink-0">
+      <TickButton label={`Mark "${title}" done`} />
     </form>
   );
 }
