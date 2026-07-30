@@ -82,8 +82,8 @@ a stub push service. **Those scripts are not in the repo** and are the obvious
 next thing to commit — port them into `tests/e2e/` with `@playwright/test` and
 add them to the workflow. That approach has caught real bugs repeatedly (a broken
 migration, silently dropped server actions, clipped calendar text, an event that
-came back from the dead) — prefer it over reasoning about whether something
-works.
+came back from the dead, a test button that deleted itself) — prefer it over
+reasoning about whether something works.
 
 ```
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers   # chromium is preinstalled
@@ -137,6 +137,16 @@ per-person routing. Two things to know: the stub must be **HTTPS** (web-push
 will not downgrade), so it uses a self-signed cert and the app runs with
 `NODE_TLS_REJECT_UNAUTHORIZED=0` for that test only; and the fake subscription
 needs a real P-256 key pair, or encryption fails before anything is sent.
+
+**A stub that accepts anything proves nothing.** The first version of that stub
+answered 201 to every request, so the suite confirmed the push was well-formed
+without confirming a real service would take it — and the app shipped
+identifying itself as `mailto:agenda@localhost`, which Apple answers with 403
+BadJwtToken and no delivery. Every check passed, both phones registered, nothing
+ever arrived. The stub now decodes the VAPID token and refuses a bad subject the
+way Apple does, and the rule itself is pinned by `tests/contact.test.ts`, which
+needs no browser and runs in CI. **When standing in for somebody else's service,
+copy its refusals, not just its successes.**
 
 **Check both sides of a write.** For anything that changes an event, assert
 against the CalDAV server with an independent `tsdav` client *and* against what
@@ -235,6 +245,18 @@ and kept in `settings`, unencrypted on purpose: the private key is only useful
 alongside the subscription endpoints, which are in the same database, so
 encrypting one of the two would be theatre. Losing them costs a re-subscribe per
 phone, nothing more.
+
+**`AGENDA_PUBLIC_URL` is load-bearing** (`src/lib/contact.ts`). It's the VAPID
+subject — "who to contact about this push traffic" — and Apple refuses anything
+that isn't a real https address or a real email address, delivering nothing while
+both phones still show as registered. `fly.toml` sets it to
+`https://agenda-nd.fly.dev`; the same value is the default in code, so a fresh
+deploy works either way. Change it if the app moves. When a send fails, the
+reason is written to `push_subscriptions.last_error` and shown on that device's
+row in Setup, and "Send a test" says which of the four things happened — nothing
+registered, the phone had revoked and was dropped, the service refused it and
+why, or it worked. Reported, never thrown: an exception in a server action is a
+blank error page.
 
 **The service worker is the exception to this project's own rule, and it must
 stay narrow.** `public/sw.js` handles `push` and `notificationclick` and has
