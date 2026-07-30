@@ -10,7 +10,7 @@ import { countdownTo, type Countdown } from "@/lib/headline";
 import { removeDormEvent } from "@/lib/actions";
 import { SubmitButton } from "@/components/forms";
 import { Pencil, Trash2 } from "lucide-react";
-import { listClass } from "@/components/ui";
+import { OwnerTile, listClass, ownerWash } from "@/components/ui";
 
 export function EventRow({
   event,
@@ -35,18 +35,23 @@ export function EventRow({
   // This used to be said only for events added in the app, so one from a shared
   // iCloud calendar was labelled with nothing at all — even though it's treated
   // as the dorm's everywhere else, notifications included.
+  // The tile beside this already carries the name, so the line underneath only
+  // adds what the tile can't: that it's a chore, and where it is.
   const whose = [
-    event.personName,
-    event.personName === null && event.source !== "chore" ? "Dorm" : null,
     event.source === "chore" ? "Chore" : null,
     event.location,
   ].filter(Boolean);
 
   return (
     <li
-      className={`flex items-stretch gap-3 px-4 py-3 ${
-        past ? "opacity-45" : ""
-      } ${next || now ? "bg-accent/5" : ""}`}
+      className={`flex items-stretch gap-2.5 px-4 py-3 ${past ? "opacity-45" : ""}`}
+      // The live row is washed in whose it is, rather than in the app's blue.
+      // A generic accent says "this one matters"; the owner's colour says that
+      // and who it belongs to, which is the question a shared calendar exists
+      // to answer.
+      style={
+        next || now ? { background: ownerWash(event.color) } : undefined
+      }
     >
       {/* The left rail. When a thing is close enough to count down to, the
           count *is* the rail — a figure big enough to read without looking,
@@ -54,7 +59,7 @@ export function EventRow({
           the clock in your status bar; "23 minutes" has already done that.
           Everything else — finished, all-day, another day — keeps the time,
           which is the more useful fact once a countdown stops being one. */}
-      <div className="w-16 shrink-0 pt-px text-right">
+      <div className="w-[3.25rem] shrink-0 pt-px text-right">
         {countdown ? (
           <>
             <span
@@ -80,11 +85,7 @@ export function EventRow({
           </span>
         )}
       </div>
-      <span
-        aria-hidden="true"
-        className="w-[3px] shrink-0 rounded-full"
-        style={{ backgroundColor: event.color }}
-      />
+      <OwnerTile color={event.color} name={event.personName} />
       <div className="min-w-0 flex-1">
         {/* Wraps rather than truncating. An entry whose whole point is its name
             is not improved by hiding half of it. The "now"/"next" badges that

@@ -10,7 +10,12 @@ import { CompleteChoreTick } from "@/components/chore-controls";
 import { HeadlineLine } from "@/components/headline";
 import { buildHeadline } from "@/lib/headline";
 import { DORM_COLOR } from "@/lib/colors";
-import { PageHeader, SectionTitle, listClass } from "@/components/ui";
+import {
+  OwnerTile,
+  PageHeader,
+  SectionTitle,
+  listClass,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -122,14 +127,10 @@ export default async function HomePage() {
               <li key={chore.id} className="flex items-stretch gap-3 px-4 py-3">
                 <CompleteChoreTick choreId={chore.id} title={chore.title} />
                 {/* Whose turn it is, in the same place and shape as an event
-                    row's colour: tick, bar, words. On the right it read as a
-                    scrollbar rather than as a person. */}
-                <span
-                  aria-hidden="true"
-                  className="w-[3px] shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: chore.assignee?.color ?? "transparent",
-                  }}
+                    row's: tick, colour, words. */}
+                <OwnerTile
+                  color={chore.assignee?.color ?? DORM_COLOR}
+                  name={chore.assignee?.name ?? null}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium leading-snug">
@@ -139,9 +140,6 @@ export default async function HomePage() {
                     <span className={chore.overdue ? "text-red-500" : "text-muted"}>
                       {chore.dueLabel}
                     </span>
-                    {chore.assignee && (
-                      <span className="text-muted"> · {chore.assignee.name}</span>
-                    )}
                   </p>
                 </div>
               </li>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { syncNow } from "@/lib/actions";
+import { textOn } from "@/lib/colors";
 import { RefreshButton } from "@/components/refresh-button";
 
 /**
@@ -98,6 +99,45 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
-// The `Dot` that used to live here is gone: event rows now carry a full-height
-// colour bar instead, which reads as whose-it-is at a glance where a 8px circle
-// only read as decoration.
+/**
+ * Whose something is, as a block of colour with their initial in it.
+ *
+ * This app had colour and barely showed any: a 3px hairline down the side of a
+ * row, an 8px dot. The apps worth copying do the opposite — Dime gives every
+ * row a saturated tile and it's most of what you see on the screen; Lumy paints
+ * whole surfaces. Colour that small isn't restraint, it's just grey with a
+ * stripe.
+ *
+ * The initial does real work as well as carrying the colour: on a shared
+ * calendar the question is nearly always *whose*, and a letter answers it
+ * without the legend at the bottom of the calendar page.
+ */
+export function OwnerTile({
+  color,
+  name,
+}: {
+  color: string;
+  /** Null is the dorm's — both roommates', which is a name of its own. */
+  name: string | null;
+}) {
+  const label = name ?? "Dorm";
+  return (
+    <span
+      title={label}
+      // Not aria-hidden. The letter replaced a written-out name in the row, so
+      // hiding it would take "whose is this" away from a screen reader
+      // entirely — the one reader that can't infer J from the colour.
+      role="img"
+      aria-label={label}
+      className="flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-lg text-[0.6875rem] font-bold"
+      style={{ backgroundColor: color, color: textOn(color) }}
+    >
+      <span aria-hidden="true">{label.trim().charAt(0).toUpperCase()}</span>
+    </span>
+  );
+}
+
+/** A row's background, washed with whose it is. */
+export function ownerWash(color: string, strength = "9%"): string {
+  return `color-mix(in srgb, ${color} ${strength}, var(--color-surface))`;
+}

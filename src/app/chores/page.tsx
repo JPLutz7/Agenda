@@ -3,6 +3,7 @@ import { getChores, getPeople, timezone } from "@/lib/data";
 import { notifyTodayInBackground } from "@/lib/push";
 import { addChore, updateChore } from "@/lib/actions";
 import { today } from "@/lib/dates";
+import { DORM_COLOR } from "@/lib/colors";
 import {
   ActionForm,
   Disclosure,
@@ -15,7 +16,7 @@ import {
   RemoveChoreButton,
   SnoozeChoreButton,
 } from "@/components/chore-controls";
-import { Empty, PageHeader, listClass } from "@/components/ui";
+import { Empty, OwnerTile, PageHeader, listClass } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +46,9 @@ export default async function ChoresPage() {
                 is a lot of furniture around "take the bins out". */}
             <div className="flex items-stretch gap-3">
               <CompleteChoreTick choreId={chore.id} title={chore.title} />
-              <span
-                aria-hidden="true"
-                className="w-[3px] shrink-0 rounded-full"
-                style={{
-                  backgroundColor: chore.assignee?.color ?? "transparent",
-                }}
+              <OwnerTile
+                color={chore.assignee?.color ?? DORM_COLOR}
+                name={chore.assignee?.name ?? null}
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium leading-snug">{chore.title}</p>
@@ -92,8 +90,8 @@ export default async function ChoresPage() {
                 push it back a day, delete it — live in here too now, so they
                 cost the row nothing until they're asked for. */}
             {/* Indented to line up with the title above it, not with the tick:
-                24px tick + 12px gap + 3px bar + 12px gap. */}
-            <details className="group mt-1 pl-[3.1875rem]">
+                24px tick + 12px gap + 28px tile + 12px gap. */}
+            <details className="group mt-1 pl-[5.25rem]">
               <summary className="cursor-pointer list-none py-1 text-xs font-medium text-accent">
                 <span className="group-open:hidden">Edit</span>
                 <span className="hidden group-open:inline">Cancel</span>
