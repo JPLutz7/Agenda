@@ -190,6 +190,11 @@ export function CalendarView({
       {scale !== "year" && (
         <p className="mt-2 px-1 text-xs text-muted">
           Double-tap (or double-click) an empty spot to add something there.
+          {scale === "week" && (
+            // Worth saying once: swiping the grid deliberately no longer moves
+            // the week, so without this the other days look unreachable.
+            <> Swipe the row of dates, or tap one, to reach the other days.</>
+          )}
         </p>
       )}
 

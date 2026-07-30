@@ -323,7 +323,18 @@ export function TimeGrid({
               <button
                 key={day.day}
                 type="button"
-                onClick={() => onSelect(index)}
+                onClick={(e) => {
+                  onSelect(index);
+                  // Brings a half-visible date fully into view, which makes
+                  // tapping along the row a way to cross the week without
+                  // swiping at all. `nearest` means a date already fully on
+                  // screen doesn't cause a pointless slide.
+                  e.currentTarget.scrollIntoView({
+                    inline: "nearest",
+                    block: "nearest",
+                    behavior: "smooth",
+                  });
+                }}
                 aria-pressed={isSelected}
                 aria-current={day.isToday ? "date" : undefined}
                 aria-label={`${day.weekdayShort} ${day.dayOfMonth}${
@@ -393,7 +404,27 @@ export function TimeGrid({
         )}
         </div>
 
-        <div className="relative flex" style={{ height: DAY_HEIGHT }}>
+        {/*
+          A finger on the hours can only move them up and down.
+          `touch-action: pan-y` is a promise to the browser, made before the
+          gesture starts, that nothing here scrolls sideways — so iOS never
+          begins a horizontal pan from this area at all. Nothing else does this
+          reliably: a scroll container that *can* go both ways will follow a
+          finger diagonally, and the grid snaps to whole days, so a few degrees
+          off vertical costs you a day. Correcting it afterwards is too late,
+          because by then the scroll is running on the compositor where script
+          can't reach it.
+
+          Deliberately on the hours rather than on the scroller: touch-action
+          restricts the element a gesture *starts* on, and the day headers above
+          are left unrestricted so a swipe across them still moves the week.
+          That's the trade — swiping the calendar itself no longer changes the
+          day, and swiping the row of dates does.
+        */}
+        <div
+          className="relative flex touch-pan-y"
+          style={{ height: DAY_HEIGHT }}
+        >
           <div
             className="sticky left-0 z-20 shrink-0 bg-surface"
             style={{ width: AXIS_WIDTH }}
