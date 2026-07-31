@@ -53,7 +53,12 @@ import {
   refreshPricesIfStale,
   refreshWantPrices,
 } from "./prices";
-import { looksLikeUrl, shopName } from "./scrape";
+import {
+  bestBuyNameFromUrl,
+  bestBuySku,
+  looksLikeUrl,
+  shopName,
+} from "./scrape";
 import { notifyEveryone, notifyOthers } from "./push";
 
 export type ActionState = { error?: string; ok?: string };
@@ -1242,7 +1247,29 @@ export async function addListItem(
   // item is named from the page on the first check.
   const pastedLink = looksLikeUrl(itemText);
 
-  const info = pastedLink
+  // A Best Buy link is not just another shop's. Their site blocks the generic
+  // price reader, so one pasted here used to become an item whose price could
+  // never be checked — while the address itself was already carrying the SKU
+  // their own API answers by. So it binds straight to that product, and keeps
+  // the link.
+  const sku = pastedLink ? bestBuySku(itemText) : null;
+
+  const info = sku
+    ? db
+        .prepare(
+          `INSERT INTO list_items
+             (text, added_by, category, retailer, retailer_sku, retailer_url)
+           VALUES (?, ?, 'want', 'bestbuy', ?, ?)`,
+        )
+        // Named from the address rather than "bestbuy.com". A real name
+        // replaces it the first time a price check succeeds.
+        .run(
+          bestBuyNameFromUrl(itemText) ?? shopName(itemText),
+          addedBy,
+          sku,
+          itemText,
+        )
+    : pastedLink
     ? db
         .prepare(
           `INSERT INTO list_items
@@ -1273,7 +1300,10 @@ export async function addListItem(
         "SELECT retailer_name FROM list_items WHERE id = ?",
       )
       .get(newId);
-    label = named?.retailer_name?.slice(0, 200) || shopName(itemText);
+    label =
+      named?.retailer_name?.slice(0, 200) ||
+      bestBuyNameFromUrl(itemText) ||
+      shopName(itemText);
     db.prepare("UPDATE list_items SET text = ? WHERE id = ?").run(label, newId);
   }
 
@@ -1417,20 +1447,26 @@ export async function updateListItem(
   if (source === "link" && !link) {
     return { error: "Paste the product's web address, or pick another source." };
   }
-  if (source === "link" && !looksLikeUrl(link!)) {
+  // Checked whenever there's one at all, not only when it's the price source —
+  // it's kept and shown either way now, so a typo in it is worth catching
+  // rather than storing as a link that goes nowhere.
+  if (link && !looksLikeUrl(link)) {
     return { error: "That doesn't look like a web address — it should start with https://." };
   }
 
   const retargeted =
     source !== item.retailer ||
-    (source === "bestbuy" && query !== item.retailer_query) ||
+    // A Best Buy link supplies the SKU, so changing it retargets just as
+    // surely as changing the search text does.
+    (source === "bestbuy" &&
+      (query !== item.retailer_query || link !== item.retailer_url)) ||
     (source === "link" && link !== item.retailer_url);
 
   db.prepare(
     `UPDATE list_items
      SET text = ?, added_by = ?, retailer = ?, retailer_query = ?,
-         retailer_url  = CASE WHEN ? THEN ? ELSE retailer_url END,
-         retailer_sku  = CASE WHEN ? THEN NULL ELSE retailer_sku END,
+         retailer_url  = ?,
+         retailer_sku  = CASE WHEN ? THEN ? ELSE retailer_sku END,
          retailer_name = CASE WHEN ? THEN NULL ELSE retailer_name END,
          price_error   = NULL
      WHERE id = ?`,
@@ -1439,11 +1475,17 @@ export async function updateListItem(
     addedBy,
     source,
     query,
+    // The link is kept whatever the price is coming from. It used to be wiped
+    // unless it *was* the price source, on the reasoning that "View at Best
+    // Buy" beside a hand-typed price is a small lie. It isn't: the line above
+    // it already says where the price came from, and a link to the product is
+    // useful on its own — it's how you go and look at the thing. Losing it
+    // because you switched to typing the price in is the worse surprise.
+    link,
     retargeted ? 1 : 0,
-    // A link keeps its URL; the other two have no business holding one, and a
-    // stale "View at Best Buy" against a hand-typed price is a small lie.
-    source === "link" ? link : null,
-    retargeted ? 1 : 0,
+    // Re-binding to Best Buy: a link to their site carries the SKU, which
+    // beats searching for the product by name.
+    source === "bestbuy" && link ? bestBuySku(link) : null,
     retargeted ? 1 : 0,
     itemId,
   );

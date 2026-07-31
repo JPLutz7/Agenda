@@ -412,3 +412,92 @@ export function shopName(url: string): string {
 export function looksLikeUrl(text: string): boolean {
   return /^https?:\/\/\S+$/i.test(text.trim());
 }
+
+/**
+ * The SKU out of a Best Buy product address, or null if it isn't one.
+ *
+ * Worth doing rather than treating a bestbuy.com link like any other shop's,
+ * for two reasons. Best Buy blocks the generic price reader — pasting one of
+ * their links used to make an item whose price could never be checked — and
+ * their own API answers by SKU, which the link is already carrying. So the link
+ * binds straight to the right product, with none of the guessing that comes
+ * from searching for a product by its name.
+ *
+ * Both shapes their site uses:
+ *   …/site/lg-48-class-b5-oled/6588359.p?skuId=6588359
+ *   …/site/combo/whatever/xyz?skuId=6588359
+ * The query parameter wins when both are present — on a bundle page the path
+ * carries the combo's id and `skuId` carries the thing you actually chose.
+ */
+/**
+ * A readable product name out of a Best Buy address.
+ *
+ * Their URLs carry the product's name as a slug —
+ * `/site/lg-48-class-b5-series-oled-evo-4k-smart-tv/6588359.p` — and without
+ * this a link pasted while there's no API key becomes an item called
+ * "bestbuy.com", which is a poor thing to find on a wish list. The real name
+ * replaces this the first time a price check succeeds.
+ *
+ * Acronyms are the only fiddly part: plain title case turns OLED into "Oled"
+ * and 4K into "4k". The list below is the ones a student's wish list actually
+ * hits; anything not on it just gets its first letter capitalised, which is
+ * right for ordinary words and no worse than the slug for the rest.
+ */
+/** Path segments that belong to the address, not to the product. */
+const STRUCTURAL_SEGMENTS = new Set(["site", "product", "products", "en-ca", "fr-ca"]);
+
+const SHOUTED = new Set([
+  "tv", "oled", "qled", "led", "lcd", "hd", "uhd", "hdr", "4k", "8k", "usb",
+  "usbc", "ssd", "hdd", "ram", "cpu", "gpu", "pc", "ps5", "xbox", "hdmi",
+  "wifi", "lg", "hp", "msi", "asus", "amd", "rtx", "gtx", "ai",
+]);
+
+export function bestBuyNameFromUrl(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  // The slug is the segment before the one ending in `.p`.
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  const skuIndex = parts.findIndex((s) => /^\d{5,}\.p$/.test(s));
+  const slug = skuIndex > 0 ? parts[skuIndex - 1] : null;
+  if (!slug || !/[a-z]/i.test(slug)) return null;
+  // Some of their addresses carry no product slug at all — `/site/6588359.p`,
+  // or `/en-ca/product/6588359.p` — and the segment before the SKU is then
+  // part of the path's own structure. Naming an item "Site" or "Product" is
+  // worse than falling back to the shop's name. A real slug is always several
+  // words joined by hyphens.
+  if (!slug.includes("-") || STRUCTURAL_SEGMENTS.has(slug.toLowerCase())) {
+    return null;
+  }
+
+  const words = slug.split("-").filter(Boolean);
+  if (words.length === 0) return null;
+
+  return words
+    .map((word) =>
+      SHOUTED.has(word.toLowerCase())
+        ? word.toUpperCase()
+        : word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(" ")
+    .slice(0, 200);
+}
+
+export function bestBuySku(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)bestbuy\.(com|ca)$/i.test(parsed.hostname)) return null;
+
+  const fromQuery = parsed.searchParams.get("skuId");
+  if (fromQuery && /^\d+$/.test(fromQuery)) return fromQuery;
+
+  const fromPath = /\/(\d{5,})\.p(?:$|[/?#])/.exec(parsed.pathname + "?");
+  return fromPath ? fromPath[1] : null;
+}

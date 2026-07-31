@@ -11,7 +11,13 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractPrice, looksLikeUrl, shopName } from "../src/lib/scrape.ts";
+import {
+  bestBuyNameFromUrl,
+  bestBuySku,
+  extractPrice,
+  looksLikeUrl,
+  shopName,
+} from "../src/lib/scrape.ts";
 
 const page = (head: string, body = "") =>
   `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
@@ -143,4 +149,54 @@ test("shopName and looksLikeUrl", () => {
   assert.equal(looksLikeUrl("  http://example.com  "), true);
   assert.equal(looksLikeUrl("LG 48 inch OLED"), false);
   assert.equal(looksLikeUrl("ftp://example.com/x"), false);
+});
+
+test("a Best Buy link gives up its SKU, and other shops' links don't", () => {
+  // The two shapes their site uses.
+  assert.equal(
+    bestBuySku("https://www.bestbuy.com/site/lg-48-class-b5-series-oled-evo-4k-smart-tv/6588359.p?skuId=6588359"),
+    "6588359",
+  );
+  assert.equal(
+    bestBuySku("https://www.bestbuy.com/site/lg-48-oled/6588359.p"),
+    "6588359",
+  );
+  // On a bundle page the path carries the combo and skuId carries the choice,
+  // so the query parameter has to win.
+  assert.equal(
+    bestBuySku("https://www.bestbuy.com/site/combo/tv-and-soundbar/1234567.p?skuId=6588359"),
+    "6588359",
+  );
+  assert.equal(bestBuySku("https://www.bestbuy.ca/en-ca/product/6588359.p"), "6588359");
+
+  // Anything else is somebody else's shop, and goes through the price reader.
+  assert.equal(bestBuySku("https://www.amazon.com/dp/B0ABCDEFG"), null);
+  assert.equal(bestBuySku("https://shop.example/product/42"), null);
+  // A lookalike domain must not be mistaken for the real one.
+  assert.equal(bestBuySku("https://bestbuy.com.evil.example/site/1234567.p"), null);
+  assert.equal(bestBuySku("https://www.bestbuy.com/site/searchpage.jsp?st=oled"), null);
+  assert.equal(bestBuySku("not a url at all"), null);
+});
+
+test("and gives up a readable product name too", () => {
+  assert.equal(
+    bestBuyNameFromUrl("https://www.bestbuy.com/site/lg-48-class-b5-series-oled-evo-4k-smart-tv/6588359.p?skuId=6588359"),
+    "LG 48 Class B5 Series OLED Evo 4K Smart TV",
+  );
+  // The acronyms are the point: plain title case gives "Oled", "4k", "Tv".
+  assert.equal(
+    bestBuyNameFromUrl("https://www.bestbuy.com/site/samsung-65-qled-uhd-hdr/1234567.p"),
+    "Samsung 65 QLED UHD HDR",
+  );
+  // Ordinary words keep ordinary capitalisation.
+  assert.equal(
+    bestBuyNameFromUrl("https://www.bestbuy.com/site/desk-lamp-with-clamp/1234567.p"),
+    "Desk Lamp With Clamp",
+  );
+  // Nothing to take a name from: the segment before the SKU is part of the
+  // address rather than the product, and "Site" is a worse name than the fallback.
+  assert.equal(bestBuyNameFromUrl("https://www.bestbuy.com/site/6588359.p"), null);
+  assert.equal(bestBuyNameFromUrl("https://www.bestbuy.ca/en-ca/product/6588359.p"), null);
+  assert.equal(bestBuyNameFromUrl("https://shop.example/thing"), null);
+  assert.equal(bestBuyNameFromUrl("nonsense"), null);
 });

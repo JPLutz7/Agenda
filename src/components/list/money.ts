@@ -20,7 +20,11 @@ export function shopLabel(item: {
 }): string {
   if (item.retailer === "bestbuy") return "Best Buy";
   try {
-    return new URL(item.retailer_url ?? "").hostname.replace(/^www\./, "");
+    const host = new URL(item.retailer_url ?? "").hostname.replace(/^www\./, "");
+    // Named properly even when Best Buy isn't where the price came from — an
+    // item whose price you type in by hand can still carry a link to their
+    // page, and "bestbuy.com" beside it reads like a different shop.
+    return /^bestbuy\.(com|ca)$/i.test(host) ? "Best Buy" : host;
   } catch {
     return "the shop";
   }

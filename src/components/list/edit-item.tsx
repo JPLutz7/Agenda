@@ -80,8 +80,8 @@ export function EditItemForm({
           </Field>
 
           {/* Both fields are always shown rather than swapped by a script:
-              only the one matching the source above is used, and seeing what
-              the other one still holds beats wondering where it went. */}
+              seeing what the other one still holds beats wondering where it
+              went. */}
           <Field label="Best Buy: search for">
             <input
               name="search"
@@ -91,7 +91,10 @@ export function EditItemForm({
             />
           </Field>
 
-          <Field label="A link: the product&rsquo;s web address">
+          {/* No longer "a link: …", because the link is kept and shown whatever
+              the price source is — it's the way to go and look at the thing,
+              which is worth having even when the price is typed in by hand. */}
+          <Field label="Link to the product">
             <input
               name="url"
               type="url"
@@ -117,10 +120,12 @@ export function EditItemForm({
 
       {isWant && (
         <p className="text-xs text-muted">
-          Changing the source, the search or the link makes the app look the
-          price up again from scratch — which is the fix when the price being
-          shown is for the wrong thing. Big shops like Amazon block automatic
-          checks; the app will say so and you can type the price in.
+          The link is kept and shown whichever way the price arrives, so you can
+          always tap through to the product. Changing the source, the search or
+          the link makes the app look the price up again from scratch — which is
+          the fix when the price being shown is for the wrong thing. Big shops
+          like Amazon block automatic checks; the app will say so and you can
+          type the price in.
         </p>
       )}
 
