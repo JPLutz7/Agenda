@@ -572,30 +572,73 @@ so every drawn block keeps at least a third of the column — enough for text,
 which is what the owner actually asked for. `tests/layout.test.ts` asserts both
 halves, including that a hidden fourth event doesn't shift the visible three.
 
+## The bug sweep, and what it found
+
+**Done.** One pass over the whole app in a browser at iPhone 13 size, in both
+Chromium and WebKit, driving every screen and every action rather than reading
+the code: add / edit / delete for events, chores and list items; all four
+calendar views; both list tabs; light, dark and auto; tab switches and reloads;
+real touch gestures via CDP.
+
+**Nothing was functionally broken.** That is the headline and it is worth
+stating plainly, because three of the recent changes were suspected and all
+three came back clean:
+
+- **The rename is complete.** No user-facing "apartment" or "household"
+  survives. Every remaining hit is a code comment, the `household_events`
+  migration, or `SHARED_CALENDAR_WORDS` and its test, all deliberate.
+- **Safari agrees with Chrome in the week grid.** The intrinsic-width trap has
+  not come back: both engines measure the scroller at 856px of content in a
+  356px port, and the screenshots are interchangeable. Measured, not assumed.
+- **The phone-scroll fix holds under real touch.** A slow drag on the date row
+  moves exactly one column per gesture (0 → 116 → 232 → 348 → clamped end); a
+  vertical drag in the hour area, even one pulling 60px sideways, moves the
+  horizontal scroll by exactly zero. `touch-action: pan-y` is doing its job.
+
+What it did find were three places where screens disagreed with each other —
+the cost of verifying each change on its own. All three are fixed:
+
+- A **ticked-off list item lost its owner tile**, in the cart and in bought
+  alike, so the same thing was Nino's on one line and nobody's on the next —
+  and "sort by whose", which sorts the done half too, was reordering rows with
+  nothing on screen to explain the order.
+- A **chore's tile on the calendar** wore the right initial in the *dorm's*
+  gold, while the same chore on Today and Chores wore that person's own
+  colour. Hence `ownerColor` on `AgendaEvent`: the tile answers "whose turn",
+  the block's tint answers "whose thing it is", and for a chore those are
+  different answers. The block on the grid is still gold.
+- The **missing-Best-Buy-key explanation repeated in red under every item**
+  that had been checked once — four copies of one sentence on a screen whose
+  amber bar already said it, and absent under items nobody had checked, so the
+  list disagreed with itself. The bar says it once now.
+
+Two smaller things were looked at and deliberately left alone, both because
+they turned out to be intentional and documented in the code: the per-row
+countdown *replaces* the clock time rather than sitting beside it, and a list
+item's edit form stays open after saving (it shows `Saved "…"`, the same
+pattern the event dialog uses).
+
+**A trap for the next session, which cost time here.** `lsof` does not see
+listening sockets in this container, so "is the old server still up?" cannot be
+answered that way — a stale server will keep serving the previous build while
+`npm start` fails with EADDRINUSE somewhere you aren't looking, and you will
+conclude your fix didn't work. Start each run on a **fresh port** and confirm
+from that run's own log before believing anything the browser shows you. Two
+findings were chased against a stale server before this was spotted.
+
 ## Next task
 
-**A bug sweep, then the e2e suites into the repo.**
+**The e2e suites into the repo.** They still live in a scratchpad that dies
+with the session, which means every session re-derives them and CI never runs
+any of them. This sweep re-derived them again: a login helper, an HTTPS
+front-end (the session cookie is `secure`, so plain http drops it and the
+sign-in silently fails), seeding through the UI, and CDP touch gestures.
+Porting that into `tests/e2e/` with `@playwright/test` and adding a job to the
+workflow is the highest-value work left that isn't a feature.
 
-The last several sessions added surface quickly — a rename through the whole
-app, a colour pass, light/dark, countdowns, sorting — and each was verified on
-its own. What hasn't happened is one pass over the app as a whole, in a browser,
-looking for what those changes broke in each other's areas rather than in their
-own. Do that before building anything new. Things with a known smell:
-
-- The **calendar grid's event blocks never got the owner-tile treatment** the
-  List and Setup rows did, so the two halves of the app now disagree about how
-  a person is shown.
-- The **rename** touched every screen; check the seeded rows, the notification
-  bodies and the `<select>` labels for a surviving "apartment" or "household"
-  outside `SHARED_CALENDAR_WORDS`, which keeps them on purpose.
-- **Safari**, always — see the intrinsic-width trap in Testing above. Chromium
-  passing is not evidence.
-
-Then the thing that keeps biting: **the Playwright suites are still not in the
-repo.** They live in a scratchpad that dies with the session, which means every
-session re-derives them and CI never runs any of them. Porting them into
-`tests/e2e/` with `@playwright/test` and adding a job to the workflow is the
-highest-value work left that isn't a feature.
+Note for whoever does it: `/opt/pw-browsers` ships a WebKit build older than
+the `playwright` npm package expects, so `npx playwright install webkit` is
+needed once before WebKit will launch.
 
 After that, the feature the owner ranked first: **who owes whom**, a monthly
 split from `price_history` and `list_items.added_by` — arithmetic on data the
