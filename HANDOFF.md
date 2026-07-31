@@ -65,10 +65,13 @@ credentials.
 
 ## Testing
 
-**`npm test`.** 33 unit tests over the four things whose bugs are invisible
-until they're embarrassing: the date and timezone maths (`tests/dates.test.ts`),
-recurring event expansion (`ics`), reading a price out of a page (`prices`), and
-where blocks go in the calendar grid (`layout`). They run in about a second, need
+**`npm test`.** 60 unit tests over the things whose bugs are invisible until
+they're embarrassing: the date and timezone maths (`tests/dates.test.ts`),
+recurring event expansion (`ics`), reading a price out of a page (`prices`),
+where blocks go in the calendar grid (`layout`), the VAPID contact address
+Apple refuses (`contact`), which calendar names read as the dorm's
+(`shared-calendar`), the Today headline and its countdowns (`headline`), and
+the shopping list's sort orders (`list-sort`). They run in about a second, need
 no browser and no server, and **`.github/workflows/deploy.yml` will not deploy
 if they fail**.
 
@@ -334,6 +337,62 @@ is the moment you'd have seen the chore anyway, so a scheduler pointed at
   around it was grey — the single thing that most made the app look homemade.
   They're lucide components now.
 
+**The design brief, and where it came from.** The owner named the apps he
+wanted this to feel like — Sam Ruston's (Weather Timeline, Flamingo, BuzzKill,
+Bouncer, Luci), then a gallery at laudableapps.com and a Medium list. Reading
+those pages as text was useless; what worked was downloading the screenshots
+and looking at them. Three things came out of that and are now load-bearing:
+
+- **Lead with the answer.** Every screen opens with one large sentence — "Two
+  things today, first at 6pm" — built by `buildHeadline` in `src/lib/headline.ts`,
+  not with a title and a list. It's set at the size those apps actually use
+  (measured off the screenshots, not guessed).
+- **Per-row countdowns, the way Flighty does them.** `countdownTo` shows "in
+  3h 20m" beside a row inside a twelve-hour horizon (`COUNTDOWN_HORIZON_MINUTES`)
+  and nothing outside it — a countdown to something nine days away is noise.
+- **Colour, but only where it means something.** The app was too monochrome;
+  the fix was owner colour on the things that belong to somebody (`OwnerTile`,
+  `ownerWash`, `tintedBlock` in `ui.tsx`), not decoration everywhere. `OwnerTile`
+  is `role="img"` with the owner's full name as its `aria-label` — it was
+  `aria-hidden` at first, which silently deleted whose-is-it from a screen
+  reader. The same tile is used on List and in Setup so the two agree.
+
+One reversal worth remembering: a floating drop shadow was added to the panels
+because it felt more "designed", and the reference screenshots then showed flat
+panels with a hairline border. It came back out in the same sitting. **When
+there's a reference, look at it before deciding.**
+
+**Light and dark, and anything else this phone remembers** (`src/lib/prefs.ts`).
+Per-device preferences live in cookies, read on the server and written into the
+HTML, so the first paint is already right — the usual client-side script flashes
+the wrong colours for a frame on every page load. Two of them so far: the colour
+scheme (`agenda_theme`, Auto/Light/Dark, and Auto is the *absence* of the cookie)
+and the shopping list's sort (`agenda_list_sort`). Cookies rather than the
+database because both roommates share one login: anything stored centrally would
+mean one of them turning on dark mode turns it on for the other. Nothing here is
+trusted — the worst a forged value can do is show you your own screen wrong.
+
+Both pickers are the same shape: one `<form>` per option posting to a server
+action (`chooseTheme`, `chooseListSort`), `aria-pressed` on the chosen one, no
+client-side JavaScript. The list sort was in the URL first, and that was wrong
+in a way worth stating: the tab bar and every notification link to a plain
+`/list`, so the choice reset on every arrival. A control you re-choose each
+visit is one you stop using.
+
+**Scrolling the calendar on a phone.** The week grid scrolls sideways and the
+hours scroll down, and the two used to fight: a thumb dragging down the hours
+would drift a column sideways and change the day. The fix that worked is
+`touch-action: pan-y` on the hour area — the browser refuses the horizontal
+gesture there outright — plus one column per gesture in the wheel handler for
+trackpads. Two earlier attempts failed and are worth not repeating: damping the
+sideways delta does nothing while `scroll-snap-type: x mandatory` is on (the
+snap re-runs after every programmatic scroll), and a ratio-based wheel test with
+no absolute floor gets *easier* to pass as momentum decays. Also: **synthetic
+DOM touch events do not scroll anything.** Real touch testing here means CDP
+`Input.dispatchTouchEvent`. Two rounds of this were spent tuning the mouse wheel
+before the owner said "I was always talking about the phone" — on a screen with
+no mouse, tune the touch path first.
+
 **Colours.** `src/lib/colors.ts` is the one place they live: the dorm is
 gold, and each person keeps their own. Nino red and João blue were applied
 once by `applyRequestedColors` in `db.ts`, which leaves a `settings` marker so
@@ -402,6 +461,24 @@ Pasting a URL into the add box picks `'link'` on its own and renames the item
 from the page — a raw URL is a terrible name for a wish list. `src/lib/scrape.ts`
 reads JSON-LD first, then Open Graph, then Amazon's own markup.
 
+**A link is kept whatever prices the item.** Best Buy blocks page reads, so a
+pasted Best Buy URL binds to the API by SKU (`bestBuySku` in `scrape.ts`) and
+the item is named from the address (`bestBuyNameFromUrl`, which drops the
+structural path segments and un-shouts acronyms). `retailer_url` is stored
+either way, so the row still offers "View at Best Buy" and switching an item to
+a hand-typed price no longer throws the link away — the link is how you get back
+to the product, which has nothing to do with where the number came from.
+
+**Sorting the list** (`src/lib/list-sort.ts`, pure and unit-tested). Three
+orders: as added, by price, by whose it is. Nulls sink in every order, the
+dorm's own items come first when sorting by owner, and ordering is stable
+within a group so a re-sort doesn't shuffle equals. `priceOf` reads a Want's
+current price and a Need's remembered one — the two live in different columns
+and sorting the Wants tab by a Need's column would have been silently wrong.
+Each tab sorts its own items, and the "done" half is sorted too. The picker is
+hidden below two items; offering to reorder one thing makes an app feel like a
+form.
+
 **What actually works, measured rather than assumed.** One request each to
 twelve real shops, with the same parser the app uses:
 
@@ -443,9 +520,10 @@ groceries.
 ## Where things stand, as of the last session
 
 Working and deployed: everything above. In rough order of how recently it
-landed — link-and-Amazon pricing for Wants, per-item owner tags, editing for
-events/chores/list items, the refresh button in every page header, hand-typed
-Want prices, and notifications.
+landed — a remembered per-phone sort on the shopping list, sorting by price or
+owner, keeping a product link whatever prices the item, the colour pass and the
+owner tiles, per-row countdowns and the headline, light/dark, the phone-scroll
+fixes, the "dorm" rename, and the notification fix.
 
 **Waiting on the owner, not on code:**
 
@@ -453,11 +531,14 @@ Want prices, and notifications.
   to free email addresses, and the .edu route is blocked while he's in Brazil —
   their verification wants a US location. Retrying from campus in August is the
   plan. Nothing is broken meanwhile: Wants take a link or a typed price.
+- **Re-enabling notifications on both phones** and tapping "Send a test". The
+  VAPID subject was wrong for a while, which means the devices registered under
+  it were being refused; the fix shipped but neither phone has confirmed a
+  delivery since.
 - A scheduler pointed at `/api/refresh` each morning. Without one, chore
   reminders only fire when somebody opens the app, which is the moment they'd
   have seen the chore anyway. Any free cron service with the `AGENDA_CRON_SECRET`
   bearer token does it; that secret is also currently unset.
-- The overlap decision below.
 
 **Ideas raised and not built** (the owner picked notifications from this list):
 who-owes-whom from the prices and owner tags already recorded; Google Calendar
@@ -493,15 +574,33 @@ halves, including that a hidden fourth event doesn't shift the visible three.
 
 ## Next task
 
-**Forms lose what was typed when an action returns an error.**
+**A bug sweep, then the e2e suites into the repo.**
 
-React 19 resets uncontrolled fields once a form action completes, error or
-not, so a rejected submission clears the title, the notes, the feed URL, and
-so on. `ActionForm` in `src/components/forms.tsx` already resets deliberately
-on success (`resetOnSuccess`), which suggests the reset on failure was never
-intended. The add-event form now avoids the worst of it by marking the start
-time `required` so the browser catches it before submitting, but the general
-case is still there: any server-side validation error empties the form.
+The last several sessions added surface quickly — a rename through the whole
+app, a colour pass, light/dark, countdowns, sorting — and each was verified on
+its own. What hasn't happened is one pass over the app as a whole, in a browser,
+looking for what those changes broke in each other's areas rather than in their
+own. Do that before building anything new. Things with a known smell:
 
-Worth fixing in `ActionForm` — keep the submitted `FormData` and write the
-values back when the action reports an error.
+- The **calendar grid's event blocks never got the owner-tile treatment** the
+  List and Setup rows did, so the two halves of the app now disagree about how
+  a person is shown.
+- The **rename** touched every screen; check the seeded rows, the notification
+  bodies and the `<select>` labels for a surviving "apartment" or "household"
+  outside `SHARED_CALENDAR_WORDS`, which keeps them on purpose.
+- **Safari**, always — see the intrinsic-width trap in Testing above. Chromium
+  passing is not evidence.
+
+Then the thing that keeps biting: **the Playwright suites are still not in the
+repo.** They live in a scratchpad that dies with the session, which means every
+session re-derives them and CI never runs any of them. Porting them into
+`tests/e2e/` with `@playwright/test` and adding a job to the workflow is the
+highest-value work left that isn't a feature.
+
+After that, the feature the owner ranked first: **who owes whom**, a monthly
+split from `price_history` and `list_items.added_by` — arithmetic on data the
+app already holds, with nothing new to sign up for.
+
+*(The previous entry here — forms losing what was typed when an action returns
+an error — is done. `restoreValues` in `src/components/forms.tsx` writes the
+submitted `FormData` back on failure.)*
