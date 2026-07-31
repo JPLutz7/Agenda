@@ -60,6 +60,25 @@ export class NoPriceOnPage extends Error {
   }
 }
 
+/**
+ * The shop has the product but isn't selling it right now.
+ *
+ * Worth telling apart from "couldn't find a price". There is no price in the
+ * markup either way, but the reasons point at opposite things: this one says
+ * the *item* is the problem and the app is fine, where NoPriceOnPage invites
+ * you to go and check whether the app is broken. Two of five Amazon pages
+ * sampled while chasing this were in exactly this state.
+ */
+export class OutOfStock extends Error {
+  constructor(host: string) {
+    super(
+      `${host} has this as currently unavailable, so there's no price to ` +
+        `read. It'll check again on its own once it's back.`,
+    );
+    this.name = "OutOfStock";
+  }
+}
+
 /* ------------------------------------------------------------- addressing */
 
 /**
@@ -163,9 +182,40 @@ async function fetchPage(startUrl: string): Promise<{ html: string; host: string
       throw new Error(`${current.hostname} returned ${response.status}.`);
     }
 
-    return { html: await readCapped(response), host: current.hostname };
+    const html = await readCapped(response);
+    // A 200 that isn't the page. Bot managers increasingly answer a plain
+    // request with a JavaScript challenge rather than a 403 — same refusal,
+    // dressed as success — and without this the app reads a challenge page,
+    // finds no price in it, and blames the product for what the shop did.
+    if (looksLikeBotChallenge(html)) {
+      throw new BlockedByShop(current.hostname);
+    }
+
+    return { html, host: current.hostname };
   }
   throw new Error("That link redirects too many times.");
+}
+
+/**
+ * A "prove you're a browser" page wearing a 200.
+ *
+ * Kept to markers that only a challenge page carries — Akamai's interstitial
+ * verifier and the two shapes of Cloudflare's — and checked against the head
+ * of the document, where they always sit. Deliberately *not* matching on the
+ * word "captcha" anywhere in the body: a real product page is free to mention
+ * one, and a false positive here would tell you a working shop had blocked
+ * you.
+ *
+ * This reports the refusal. It does not try to answer the challenge — that's
+ * a shop saying no, and the honest response is to say so and let the price be
+ * typed in.
+ */
+export function looksLikeBotChallenge(html: string): boolean {
+  const head = html.slice(0, 4000);
+  return (
+    /bm-verify|triggerInterstitialChallenge|\/_sec\/verify/.test(head) ||
+    /challenge-platform|cf-browser-verification|__cf_chl_/.test(head)
+  );
 }
 
 /** Read the body but stop at MAX_BYTES rather than trusting the other end. */
@@ -379,6 +429,27 @@ export function extractPrice(html: string, host: string): ScrapedPrice | null {
   );
 }
 
+/**
+ * Amazon showing the product but not selling it.
+ *
+ * Scoped to the buy box (`apex_desktop`) rather than the page, and that scope
+ * is the whole point: "currently unavailable" appears all over a product page
+ * — in the recommendation carousel, in other sellers' offers, in the reviews —
+ * and matching any of those would report a product in stock as unavailable.
+ * The buy box is the one place that speaks for *this* item.
+ *
+ * The same block is why the first `a-offscreen` price on the page must never
+ * be trusted as a fallback: on an unavailable product those spans are the
+ * carousel's, and they belong to entirely different products.
+ */
+export function amazonOutOfStock(html: string, host: string): boolean {
+  if (!/(^|\.)amazon\./i.test(host)) return false;
+  const start = html.indexOf("apex_desktop");
+  if (start < 0) return false;
+  const buyBox = html.slice(start, start + 20_000);
+  return /currently unavailable/i.test(buyBox);
+}
+
 export async function fetchPrice(url: string): Promise<ScrapedPrice> {
   // The shop is whoever the *user* named. Under AGENDA_SCRAPE_BASE the fetched
   // host is a stand-in, and picking a parser by that would test the wrong one.
@@ -386,8 +457,14 @@ export async function fetchPrice(url: string): Promise<ScrapedPrice> {
   const { html, host } = await fetchPage(rewriteForTesting(url));
 
   const found = extractPrice(html, declaredHost);
-  if (!found) throw new NoPriceOnPage(shopName(url) || host);
-  return found;
+  if (found) return found;
+
+  // Only once there's no price: a product that's out of stock at one seller
+  // can still publish the price you'd pay, and that price is the useful answer.
+  if (amazonOutOfStock(html, declaredHost)) {
+    throw new OutOfStock(shopName(url) || host);
+  }
+  throw new NoPriceOnPage(shopName(url) || host);
 }
 
 function rewriteForTesting(url: string): string {

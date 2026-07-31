@@ -495,6 +495,27 @@ out of `corePrice_feature_div`. **That is a promise about someone else's HTML
 and will break.** When it does the item says it couldn't find a price, which is
 the same thing any unreadable page says — never a number from the wrong element.
 
+**Re-measured when the owner hit "couldn't find a price" on an Amazon link.**
+Five live product pages: three priced correctly, and the two that didn't were
+marked *currently unavailable* in Amazon's buy box — there was no price on
+those pages for anyone. So `fromAmazon` still works, and the report was the app
+being honest rather than broken. Two things came out of checking it:
+
+- **Never fall back to the first `a-offscreen` price on an Amazon page.** It is
+  tempting — an unavailable product's page is still full of `$` spans — and it
+  is wrong: those belong to the *recommendation carousel*, i.e. other products
+  (`pd_rd_i=` carries a different ASIN). This was nearly shipped as a "fix" for
+  a parser that wasn't broken. `amazonOutOfStock` is scoped to `apex_desktop`
+  for the same reason: "currently unavailable" appears all over a page whose
+  product is in stock.
+- **A refusal can wear a 200.** Amazon's *search* URLs answer a plain request
+  with an Akamai JavaScript interstitial (`bm-verify`,
+  `triggerInterstitialChallenge`) rather than a 403, so the old code read the
+  challenge page, found no price, and blamed the product. `looksLikeBotChallenge`
+  now catches that and it reports as `BlockedByShop`. It matches challenge
+  markers in the first 4KB only, and deliberately not the bare word "captcha" —
+  a false positive there tells you a working shop has blocked you.
+
 **Fetching a URL a user typed is an SSRF sink**, and this one runs on Fly where
 169.254.169.254 is a real thing. `assertPublic()` resolves the hostname and
 refuses private, loopback, link-local, CGNAT and multicast addresses, and

@@ -12,9 +12,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  amazonOutOfStock,
   bestBuyNameFromUrl,
   bestBuySku,
   extractPrice,
+  looksLikeBotChallenge,
   looksLikeUrl,
   shopName,
 } from "../src/lib/scrape.ts";
@@ -199,4 +201,77 @@ test("and gives up a readable product name too", () => {
   assert.equal(bestBuyNameFromUrl("https://www.bestbuy.ca/en-ca/product/6588359.p"), null);
   assert.equal(bestBuyNameFromUrl("https://shop.example/thing"), null);
   assert.equal(bestBuyNameFromUrl("nonsense"), null);
+});
+
+/* ------------------------------------------- refusals dressed as successes */
+
+/**
+ * The two things that look identical to a naive reader — a shop refusing with
+ * a 200, and a product the shop has stopped selling — and are worth telling
+ * apart, because one is the shop's doing and the other is the item's.
+ *
+ * Both were found against live Amazon pages: three of five sampled products
+ * priced correctly, and the two that didn't were marked unavailable in the buy
+ * box rather than broken.
+ */
+
+test("an Akamai interstitial is a refusal, not a page without a price", () => {
+  const challenge =
+    `<!doctype html><html><head>` +
+    `<meta http-equiv="refresh" content="5; URL='/s?k=x&bm-verify=AAQAAA'" />` +
+    `<title>&nbsp;</title></head><body>` +
+    `<script>function triggerInterstitialChallenge(){}</script></body></html>`;
+  assert.equal(looksLikeBotChallenge(challenge), true);
+});
+
+test("Cloudflare's challenge counts too", () => {
+  assert.equal(
+    looksLikeBotChallenge(
+      `<!doctype html><html><head><script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script></head><body></body></html>`,
+    ),
+    true,
+  );
+});
+
+test("a real product page is never mistaken for a challenge", () => {
+  // Including one that says the word, which is the false positive that would
+  // tell somebody a working shop had blocked them.
+  assert.equal(
+    looksLikeBotChallenge(
+      page(
+        ld({
+          "@type": "Product",
+          name: "Captcha Solver Handbook",
+          offers: { "@type": "Offer", price: "12.00", priceCurrency: "USD" },
+        }),
+      ),
+      ),
+    false,
+  );
+});
+
+test("Amazon's buy box saying unavailable is recognised", () => {
+  const html =
+    `<div id="apex_desktop" data-csa-c-asin="B09491FT41">` +
+    `<div id="availability"><span>Currently unavailable.</span></div>` +
+    `<div>We don't know when or if this item will be back in stock.</div></div>`;
+  assert.equal(amazonOutOfStock(html, "www.amazon.com"), true);
+});
+
+test("'currently unavailable' outside the buy box is not this product's", () => {
+  // The phrase turns up in the recommendation carousel and in other sellers'
+  // offers. Matching those would report an in-stock product as unavailable.
+  const html =
+    `<div id="apex_desktop" data-csa-c-asin="B09C5RG6KV">` +
+    `<div id="corePrice_feature_div"><span class="a-price">` +
+    `<span class="a-offscreen">$24.99</span></span></div></div>` +
+    `${"<span>filler</span>".repeat(1200)}` +
+    `<div id="similarities_feature_div">Currently unavailable.</div>`;
+  assert.equal(amazonOutOfStock(html, "www.amazon.com"), false);
+  assert.equal(extractPrice(html, "www.amazon.com")?.priceCents, 2499);
+});
+
+test("the unavailable check only speaks for Amazon", () => {
+  const html = `<div id="apex_desktop">Currently unavailable.</div>`;
+  assert.equal(amazonOutOfStock(html, "shopco.example"), false);
 });
