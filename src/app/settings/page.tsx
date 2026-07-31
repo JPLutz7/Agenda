@@ -11,7 +11,7 @@ import { getDevices, publicKey } from "@/lib/push";
 import { ICloudSetup } from "@/components/icloud-setup";
 import { PushSetup } from "@/components/push-setup";
 import { ThemePicker } from "@/components/theme-picker";
-import { getTheme } from "@/lib/theme";
+import { getTheme } from "@/lib/prefs";
 import { DORM_COLOR } from "@/lib/colors";
 import {
   addFeed,

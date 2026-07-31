@@ -1,5 +1,5 @@
 import { chooseTheme } from "@/lib/actions";
-import type { Theme } from "@/lib/theme";
+import type { Theme } from "@/lib/prefs";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [

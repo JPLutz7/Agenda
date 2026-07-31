@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { LiveRefresh } from "@/components/live-refresh";
-import { getTheme } from "@/lib/theme";
+import { getTheme } from "@/lib/prefs";
 
 export const metadata: Metadata = {
   title: "Agenda",

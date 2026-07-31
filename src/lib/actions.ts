@@ -47,7 +47,8 @@ import {
   type StoredAccount,
 } from "./caldav";
 import { canStoreSecrets, encryptSecret } from "./secrets";
-import { setTheme, type Theme } from "./theme";
+import { setListSort, setTheme, type Theme } from "./prefs";
+import type { ListSort } from "./list-sort";
 import {
   refreshOneWant,
   refreshPricesIfStale,
@@ -268,6 +269,19 @@ export async function chooseTheme(theme: Theme): Promise<void> {
   await setTheme(theme);
   // Every page, not just Setup — the whole app just changed colour, and the
   // layout is what carries it.
+  refreshViews();
+}
+
+/**
+ * The order the shopping list is shown in, remembered for this phone.
+ *
+ * Kept beside the theme rather than in the address: the list is a thing you
+ * come back to several times a day, and a sort that resets every time you
+ * arrive is one you have to re-choose every time you arrive.
+ */
+export async function chooseListSort(sort: ListSort): Promise<void> {
+  await requireSession();
+  await setListSort(sort);
   refreshViews();
 }
 

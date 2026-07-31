@@ -16,7 +16,8 @@ import { money } from "@/components/list/money";
 import { OwnerSelect } from "@/components/list/owner";
 import { PageHeader } from "@/components/ui";
 import { SortPicker } from "@/components/list/sort-picker";
-import { isListSort, sortListItems, type ListSort } from "@/lib/list-sort";
+import { sortListItems } from "@/lib/list-sort";
+import { getListSort } from "@/lib/prefs";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ async function nearestStoreLabel(): Promise<string | null> {
 export default async function ListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; edit?: string; sort?: string }>;
+  searchParams: Promise<{ tab?: string; edit?: string }>;
 }) {
   await requireSignedIn();
   // Wants go stale on their own schedule; nudge a background refresh.
@@ -49,9 +50,9 @@ export default async function ListPage({
   const params = await searchParams;
   const tab: Tab = params.tab === "wants" ? "wants" : "needs";
   const editId = Number(params.edit) || null;
-  // Anything unrecognised falls back to the order things were added, rather
-  // than erroring on a hand-typed address.
-  const sort: ListSort = isListSort(params.sort) ? params.sort : "added";
+  // Per phone, and remembered between visits. Anything unrecognised in the
+  // cookie falls back to the order things were added.
+  const sort = await getListSort();
 
   const { open, done } = getListItems();
   const people = getPeople();
@@ -67,11 +68,6 @@ export default async function ListPage({
   const wantsDone = sortListItems(done.filter((i) => i.category === "want"), sort);
 
   const store = tab === "wants" ? await nearestStoreLabel() : null;
-
-  // Switching tabs keeps the order you chose — losing it on every switch is
-  // the kind of small forgetfulness that makes a control feel broken.
-  const tabHref = (which: Tab) =>
-    `/list?tab=${which}${sort === "added" ? "" : `&sort=${sort}`}`;
 
   const tabClass = (which: Tab) =>
     `flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium transition-colors ${
@@ -92,10 +88,10 @@ export default async function ListPage({
       />
 
       <div className="mb-4 flex rounded-lg border border-border bg-surface p-0.5">
-        <Link href={tabHref("needs")} className={tabClass("needs")}>
+        <Link href="/list?tab=needs" className={tabClass("needs")}>
           Needs {needsOpen.length > 0 ? `(${needsOpen.length})` : ""}
         </Link>
-        <Link href={tabHref("wants")} className={tabClass("wants")}>
+        <Link href="/list?tab=wants" className={tabClass("wants")}>
           Wants {wantsOpen.length > 0 ? `(${wantsOpen.length})` : ""}
         </Link>
       </div>
@@ -130,7 +126,6 @@ export default async function ListPage({
       </ActionForm>
 
       <SortPicker
-        tab={tab}
         current={sort}
         itemCount={tab === "needs" ? needsOpen.length : wantsOpen.length}
       />
