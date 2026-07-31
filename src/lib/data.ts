@@ -39,7 +39,17 @@ export type AgendaEvent = {
   endsAt: string;
   allDay: boolean;
   personName: string | null;
+  /** What the block on the grid is tinted with. */
   color: string;
+  /**
+   * What the owner tile beside the row is painted with, when that isn't the
+   * same question as the block's tint. A chore is the dorm's — so its block is
+   * gold — but the tile answers "whose turn is it", and painting Nino's initial
+   * in the dorm's gold made the same chore look like two different things on
+   * Chores and on the calendar. Null means "the block's colour is the answer",
+   * which is true of every event that isn't a chore.
+   */
+  ownerColor: string | null;
   source: "feed" | "dorm" | "chore";
   dormId: number | null;
   /** Which iCloud calendar a dorm event was written to, if any. */
@@ -182,6 +192,9 @@ export function getChoreEvents(from: DayKey, to: DayKey): AgendaEvent[] {
           // Dorm colour: a chore belongs to the flat, whoever's turn it
           // happens to be.
           color: DORM_COLOR,
+          // The tile is the exception: it says whose turn it is, and it says it
+          // in that person's own colour, the same as on Chores and Today.
+          ownerColor: assignee?.color ?? null,
           source: "chore" as const,
           dormId: null,
           dormCalendarId: null,
@@ -289,6 +302,7 @@ export function getEvents(
       allDay: r.all_day === 1,
       personName: r.person_name,
       color: r.person_color ?? DORM_COLOR,
+      ownerColor: null,
       source: "feed" as const,
       dormId: null,
       dormCalendarId: null,
@@ -302,6 +316,7 @@ export function getEvents(
       allDay: r.all_day === 1,
       personName: null,
       color: DORM_COLOR,
+      ownerColor: null,
       source: "dorm" as const,
       dormId: r.id,
       dormCalendarId: r.caldav_calendar_id,

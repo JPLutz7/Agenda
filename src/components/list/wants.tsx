@@ -156,7 +156,19 @@ export function Wants({
                       ) : null}
                     </p>
 
-                    {item.price_error && (
+                    {/* A missing key is a standing condition of the whole
+                        screen, not a fault of this one item — the amber bar at
+                        the top already says it, and repeating it in red under
+                        every item said the same sentence up to four times, and
+                        only under the items that happened to have been checked
+                        once.
+
+                        Narrow on purpose: this hides the error only for the
+                        items the missing key actually explains. A link-priced
+                        item whose page wouldn't parse has nothing to do with
+                        Best Buy, and still says so. */}
+                    {item.price_error &&
+                      !(item.retailer === "bestbuy" && !hasApiKey) && (
                       <p className="mt-1 text-xs text-red-500">
                         {item.price_error}
                       </p>

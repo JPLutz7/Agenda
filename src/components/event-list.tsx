@@ -85,7 +85,12 @@ export function EventRow({
           </span>
         )}
       </div>
-      <OwnerTile color={event.color} name={event.personName} />
+      {/* The tile answers "whose", which for a chore is not the same question
+          as what its block on the grid is tinted with — see `ownerColor`. */}
+      <OwnerTile
+        color={event.ownerColor ?? event.color}
+        name={event.personName}
+      />
       <div className="min-w-0 flex-1">
         {/* Wraps rather than truncating. An entry whose whole point is its name
             is not improved by hiding half of it. The "now"/"next" badges that
