@@ -65,9 +65,10 @@ credentials.
 
 ## Testing
 
-**`npm test`.** 60 unit tests over the things whose bugs are invisible until
+**`npm test`.** 66 unit tests over the things whose bugs are invisible until
 they're embarrassing: the date and timezone maths (`tests/dates.test.ts`),
-recurring event expansion (`ics`), reading a price out of a page (`prices`),
+recurring event expansion (`ics`), reading a price out of a page and telling a
+shop's refusal from a product with no price (`prices`),
 where blocks go in the calendar grid (`layout`), the VAPID contact address
 Apple refuses (`contact`), which calendar names read as the dorm's
 (`shared-calendar`), the Today headline and its countdowns (`headline`), and
@@ -541,10 +542,19 @@ groceries.
 ## Where things stand, as of the last session
 
 Working and deployed: everything above. In rough order of how recently it
-landed — a remembered per-phone sort on the shopping list, sorting by price or
-owner, keeping a product link whatever prices the item, the colour pass and the
-owner tiles, per-row countdowns and the headline, light/dark, the phone-scroll
-fixes, the "dorm" rename, and the notification fix.
+landed — telling a shop's refusal apart from a product with no price, the three
+fixes the bug sweep turned up (whose-it-is on ticked items, a chore's tile in
+that person's colour, the Best Buy key notice said once), a remembered per-phone
+sort on the shopping list, sorting by price or owner, keeping a product link
+whatever prices the item, the colour pass and the owner tiles, per-row
+countdowns and the headline, light/dark, the phone-scroll fixes, the "dorm"
+rename, and the notification fix.
+
+**The whole app was swept in a browser on 31 July and found functionally
+sound** — see "The bug sweep, and what it found" below for what was checked,
+what it cleared and what it fixed. A next sweep should start from that list
+rather than repeat it: the areas touched since are the Amazon reader's three
+new outcomes, and anything a sweep can only see on a real phone.
 
 **Waiting on the owner, not on code:**
 
