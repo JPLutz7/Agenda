@@ -15,6 +15,8 @@ import { Wants } from "@/components/list/wants";
 import { money } from "@/components/list/money";
 import { OwnerSelect } from "@/components/list/owner";
 import { PageHeader } from "@/components/ui";
+import { SortPicker } from "@/components/list/sort-picker";
+import { isListSort, sortListItems, type ListSort } from "@/lib/list-sort";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,7 @@ async function nearestStoreLabel(): Promise<string | null> {
 export default async function ListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; edit?: string }>;
+  searchParams: Promise<{ tab?: string; edit?: string; sort?: string }>;
 }) {
   await requireSignedIn();
   // Wants go stale on their own schedule; nudge a background refresh.
@@ -47,18 +49,29 @@ export default async function ListPage({
   const params = await searchParams;
   const tab: Tab = params.tab === "wants" ? "wants" : "needs";
   const editId = Number(params.edit) || null;
+  // Anything unrecognised falls back to the order things were added, rather
+  // than erroring on a hand-typed address.
+  const sort: ListSort = isListSort(params.sort) ? params.sort : "added";
 
   const { open, done } = getListItems();
   const people = getPeople();
   const estimate = getNeedsEstimate();
   const spent = getSpentThisMonth();
 
-  const needsOpen = open.filter((i) => i.category !== "want");
-  const needsDone = done.filter((i) => i.category !== "want");
-  const wantsOpen = open.filter((i) => i.category === "want");
-  const wantsDone = done.filter((i) => i.category === "want");
+  // Sorted after the split, so each tab's chosen order applies to its own
+  // list. The "done" halves are sorted too — a cart of twenty things is worth
+  // ordering by price just as much as the list you're still writing.
+  const needsOpen = sortListItems(open.filter((i) => i.category !== "want"), sort);
+  const needsDone = sortListItems(done.filter((i) => i.category !== "want"), sort);
+  const wantsOpen = sortListItems(open.filter((i) => i.category === "want"), sort);
+  const wantsDone = sortListItems(done.filter((i) => i.category === "want"), sort);
 
   const store = tab === "wants" ? await nearestStoreLabel() : null;
+
+  // Switching tabs keeps the order you chose — losing it on every switch is
+  // the kind of small forgetfulness that makes a control feel broken.
+  const tabHref = (which: Tab) =>
+    `/list?tab=${which}${sort === "added" ? "" : `&sort=${sort}`}`;
 
   const tabClass = (which: Tab) =>
     `flex-1 rounded-md px-2 py-1.5 text-center text-sm font-medium transition-colors ${
@@ -79,10 +92,10 @@ export default async function ListPage({
       />
 
       <div className="mb-4 flex rounded-lg border border-border bg-surface p-0.5">
-        <Link href="/list" className={tabClass("needs")}>
+        <Link href={tabHref("needs")} className={tabClass("needs")}>
           Needs {needsOpen.length > 0 ? `(${needsOpen.length})` : ""}
         </Link>
-        <Link href="/list?tab=wants" className={tabClass("wants")}>
+        <Link href={tabHref("wants")} className={tabClass("wants")}>
           Wants {wantsOpen.length > 0 ? `(${wantsOpen.length})` : ""}
         </Link>
       </div>
@@ -115,6 +128,12 @@ export default async function ListPage({
           </p>
         )}
       </ActionForm>
+
+      <SortPicker
+        tab={tab}
+        current={sort}
+        itemCount={tab === "needs" ? needsOpen.length : wantsOpen.length}
+      />
 
       {tab === "needs" ? (
         <>
