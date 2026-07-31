@@ -112,6 +112,15 @@ export function Needs({
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-white">
                         <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
                       </span>
+                      {/* Ticking something off doesn't change whose it is, and
+                          the cart is exactly where that matters — it's the half
+                          of the list you settle up from. Without the tile,
+                          sorting by "whose" reordered these rows with nothing
+                          on screen to explain the order. */}
+                      <OwnerTile
+                        color={item.added_by_color ?? DORM_COLOR}
+                        name={item.added_by_name}
+                      />
                       <span className="min-w-0 flex-1 truncate text-sm text-muted line-through">
                         {item.text}
                       </span>

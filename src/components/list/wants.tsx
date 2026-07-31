@@ -254,6 +254,11 @@ export function Wants({
                     <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-accent bg-accent text-white">
                       <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
                     </span>
+                    {/* As in the cart on Needs: bought doesn't mean nobody's. */}
+                    <OwnerTile
+                      color={item.added_by_color ?? DORM_COLOR}
+                      name={item.added_by_name}
+                    />
                     <span className="min-w-0 flex-1 truncate text-sm text-muted line-through">
                       {item.text}
                     </span>
