@@ -9,6 +9,7 @@ import { ActionForm, SubmitButton, fieldClass } from "@/components/forms";
 import { Empty, OwnerTile, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { money } from "./money";
+import { ListTotals } from "./totals";
 import { Check, Trash2 } from "lucide-react";
 
 /**
@@ -22,19 +23,22 @@ import { Check, Trash2 } from "lucide-react";
 export function Needs({
   open,
   done,
-  estimate,
   people,
   editId,
 }: {
   open: ListItem[];
   done: ListItem[];
-  estimate: { totalCents: number; unpriced: number };
   people: Person[];
   /** The item whose rename form is open, from `?edit=`. */
   editId: number | null;
 }) {
   return (
     <>
+      {/* The trip estimate used to sit under the list, where a phone only
+          reaches it after scrolling past everything — and it's the number you
+          came to the screen for. */}
+      <ListTotals items={open} kind="needs" />
+
       {open.length === 0 ? (
         <Empty>Nothing on the list.</Empty>
       ) : (
@@ -79,17 +83,6 @@ export function Needs({
             </li>
           ))}
         </ul>
-      )}
-
-      {open.length > 0 && (
-        <p className="mt-2 px-1 text-xs text-muted">
-          {estimate.totalCents > 0
-            ? `About ${money(estimate.totalCents)} based on what these cost last time`
-            : "Add prices as you shop and this will start estimating the trip"}
-          {estimate.unpriced > 0 && estimate.totalCents > 0
-            ? ` · ${estimate.unpriced} with no price yet`
-            : ""}
-        </p>
       )}
 
       {done.length > 0 && (

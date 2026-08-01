@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { requireSignedIn } from "@/lib/guard";
-import {
-  getListItems,
-  getNeedsEstimate,
-  getPeople,
-  getSpentThisMonth,
-} from "@/lib/data";
+import { getListItems, getPeople, getSpentThisMonth } from "@/lib/data";
 import { addListItem, clearCheckedItems } from "@/lib/actions";
 import { hasApiKey, nearbyStores, DEFAULT_POSTAL_CODE } from "@/lib/bestbuy";
 import { refreshPricesIfStale } from "@/lib/prices";
@@ -56,7 +51,6 @@ export default async function ListPage({
 
   const { open, done } = getListItems();
   const people = getPeople();
-  const estimate = getNeedsEstimate();
   const spent = getSpentThisMonth();
 
   // Sorted after the split, so each tab's chosen order applies to its own
@@ -135,7 +129,6 @@ export default async function ListPage({
           <Needs
             open={needsOpen}
             done={needsDone}
-            estimate={estimate}
             people={people}
             editId={editId}
           />

@@ -11,6 +11,7 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { Empty, OwnerTile, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { money, shopLabel, sinceLabel } from "./money";
+import { ListTotals } from "./totals";
 import { ArrowDown, ArrowUp, Check, Trash2, TriangleAlert } from "lucide-react";
 
 /**
@@ -39,6 +40,11 @@ export function Wants({
 }) {
   return (
     <>
+      {/* Per person, because a wish list isn't one purchase: what matters is
+          how much your own pile comes to, and whether the dorm is about to
+          spend more than either of you. */}
+      <ListTotals items={open} kind="wants" />
+
       {/* Only when something actually depends on it. Link-priced items update
           perfectly well without a Best Buy key, and warning about one they
           don't use would be noise.

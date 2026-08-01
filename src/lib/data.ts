@@ -574,24 +574,10 @@ export function getListItems(): { open: ListItem[]; done: ListItem[] } {
   };
 }
 
-/**
- * What the open Needs are likely to cost, from what was last paid.
- *
- * Only items with a remembered price count towards the estimate; `unpriced`
- * says how many are missing, so a total of $12 next to a list of thirty
- * things can't be mistaken for the real figure.
- */
-export function getNeedsEstimate(): { totalCents: number; unpriced: number } {
-  const row = db
-    .prepare<[], { total: number | null; unpriced: number }>(
-      `SELECT SUM(last_price_cents) AS total,
-              SUM(CASE WHEN last_price_cents IS NULL THEN 1 ELSE 0 END) AS unpriced
-       FROM list_items
-       WHERE category = 'need' AND checked_at IS NULL`,
-    )
-    .get()!;
-  return { totalCents: row.total ?? 0, unpriced: row.unpriced ?? 0 };
-}
+/* The trip estimate used to be a query of its own here. It's now summed from
+   the rows the page already has (`totalOf` in `list-totals.ts`), because a
+   total worked out separately from the list it sits above is a second source
+   of truth for one number — and they only have to disagree once. */
 
 /**
  * What's actually been spent on Needs so far this month.
