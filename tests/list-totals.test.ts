@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  perPerson,
   totalOf,
   totalsByOwner,
   type TotalledItem,
@@ -122,6 +123,30 @@ test("two people with the same name keep separate totals", () => {
     totals.map((t) => t.cents),
     [1000, 2000],
   );
+});
+
+test("a shared thing costs each of two people half of it", () => {
+  assert.equal(perPerson(28999, 2), 14500); // $289.99 -> $145.00
+  assert.equal(perPerson(4500, 2), 2250);
+});
+
+test("and a third roommate makes it a third, not still a half", () => {
+  assert.equal(perPerson(30000, 3), 10000);
+});
+
+test("an odd number of cents rounds rather than losing the penny", () => {
+  // Two halves of $2.99 come to $3.00. Deliberate: this is the "can I afford
+  // it" figure, and the direction that can't disappoint is up.
+  assert.equal(perPerson(299, 2), 150);
+});
+
+test("there is no share when there is nobody to share with", () => {
+  assert.equal(perPerson(28999, 1), null);
+  assert.equal(perPerson(28999, 0), null);
+});
+
+test("nothing costs nobody anything, so no share is shown", () => {
+  assert.equal(perPerson(0, 2), null);
 });
 
 test("the per-person totals add up to the one total", () => {

@@ -34,6 +34,28 @@ export type Total = {
   count: number;
 };
 
+/**
+ * What a shared thing costs you, rather than what it costs.
+ *
+ * Only for the dorm's own items: those are the ones nobody has agreed to pay
+ * for alone, so the number that decides whether you can afford it is your half
+ * — a $290 monitor is a $145 decision each. Something with a person's name on
+ * it is already one person's, and halving it would be inventing a debt.
+ *
+ * Split between whoever lives here, which is two people today and stays right
+ * if a third ever moves in. With nobody to split with there is no such thing
+ * as a share, so it returns null and the caller shows nothing rather than
+ * repeating the full price in smaller type.
+ *
+ * Rounded to the nearest cent, so two halves of an odd amount can come to a
+ * penny more than the whole. That is the honest way round for a "can I afford
+ * this" figure, and it's a wish list rather than a ledger.
+ */
+export function perPerson(cents: number, people: number): number | null {
+  if (people < 2 || cents <= 0) return null;
+  return Math.round(cents / people);
+}
+
 /** One line: everything, whoever it belongs to. */
 export function totalOf(items: TotalledItem[]): Total {
   let cents = 0;

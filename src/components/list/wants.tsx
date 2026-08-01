@@ -11,7 +11,8 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { Empty, OwnerTile, listClass } from "@/components/ui";
 import { EditItemForm, EditItemLink } from "./edit-item";
 import { money, shopLabel, sinceLabel } from "./money";
-import { ListTotals } from "./totals";
+import { ListTotals, Share } from "./totals";
+import { perPerson } from "@/lib/list-totals";
 import { ArrowDown, ArrowUp, Check, Trash2, TriangleAlert } from "lucide-react";
 
 /**
@@ -43,7 +44,7 @@ export function Wants({
       {/* Per person, because a wish list isn't one purchase: what matters is
           how much your own pile comes to, and whether the dorm is about to
           spend more than either of you. */}
-      <ListTotals items={open} kind="wants" />
+      <ListTotals items={open} kind="wants" splitBetween={people.length} />
 
       {/* Only when something actually depends on it. Link-priced items update
           perfectly well without a Best Buy key, and warning about one they
@@ -81,6 +82,12 @@ export function Wants({
         <ul className="space-y-2">
           {open.map((item) => {
             const price = item.price_cents;
+            // The dorm's, so it's split. Worked out here rather than stored,
+            // which is what keeps it right the moment a price changes.
+            const share =
+              item.added_by === null && price !== null
+                ? perPerson(price, people.length)
+                : null;
             const wasCheaper =
               price !== null &&
               item.previous_price_cents !== null &&
@@ -116,6 +123,7 @@ export function Wants({
                         <span className="text-lg font-semibold">
                           {money(price)}
                         </span>
+                        {share !== null && <Share cents={share} />}
                         {item.regular_price_cents !== null && (
                           <span className="text-xs text-muted line-through">
                             {money(item.regular_price_cents)}

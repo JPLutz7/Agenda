@@ -1,5 +1,10 @@
 import { DORM_COLOR } from "@/lib/colors";
-import { totalOf, totalsByOwner, type TotalledItem } from "@/lib/list-totals";
+import {
+  perPerson,
+  totalOf,
+  totalsByOwner,
+  type TotalledItem,
+} from "@/lib/list-totals";
 import { OwnerTile, ownerWash, panelClass } from "@/components/ui";
 import { money } from "./money";
 
@@ -17,9 +22,12 @@ import { money } from "./money";
 export function ListTotals({
   items,
   kind,
+  splitBetween = 0,
 }: {
   items: TotalledItem[];
   kind: "needs" | "wants";
+  /** How many people live here, for the dorm's share. */
+  splitBetween?: number;
 }) {
   // Nothing on the list is not a total of zero, it's an absence — and an empty
   // list already says so in its own words.
@@ -63,6 +71,10 @@ export function ListTotals({
       <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-px">
         {totalsByOwner(items).map((total) => {
           const color = total.color ?? DORM_COLOR;
+          // The dorm's pile is the only one that's split — the others already
+          // have one person's name on them.
+          const share =
+            total.name === null ? perPerson(total.cents, splitBetween) : null;
           return (
             <div
               key={total.name ?? "dorm"}
@@ -78,12 +90,32 @@ export function ListTotals({
               <p className="mt-1.5 font-display text-lg font-semibold tabular-nums">
                 {money(total.cents)}
               </p>
+              {share !== null && (
+                <p className="mt-0.5 leading-tight">
+                  <Share cents={share} />
+                </p>
+              )}
               {total.unpriced > 0 && <Unpriced count={total.unpriced} />}
             </div>
           );
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * A shared thing's cost per person, beside what it costs.
+ *
+ * Smaller than the price and never instead of it: the full figure is what the
+ * shop charges and has to stay the headline, while the half is what the
+ * decision actually turns on.
+ */
+export function Share({ cents }: { cents: number }) {
+  return (
+    <span className="text-xs font-medium text-muted tabular-nums">
+      {money(cents)} each
+    </span>
   );
 }
 
