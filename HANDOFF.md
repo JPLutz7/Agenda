@@ -539,6 +539,90 @@ never be able to pass for a fresh lookup. `getSpentThisMonth` excludes Wants
 for the same reason: a price you observed on a television is not money spent on
 groceries.
 
+## Face ID
+
+**Two gates, answering different questions.** The passcode says *this device is
+allowed here* — once, then for sixty days. Face ID says *and this is one of the
+people who lives here* — every time the app is opened, on a phone that asked to
+be locked. The owner's words: required every time on mobile, the passcode a
+one-time thing, the laptop left alone.
+
+The web cannot ask for Face ID. It can ask the phone to vouch for its owner —
+WebAuthn with `userVerification: "required"` — and an iPhone answers that with
+Face ID. The app never sees a face: it sees a signature only that phone's
+secure enclave can produce, and only produces after the phone is satisfied
+about who is holding it. `passkeys` stores public keys; losing the table costs
+a re-registration per phone and gives an attacker nothing.
+
+**Four cookies, and which is load-bearing:**
+
+- `agenda_session` — the passcode, sixty days. Unchanged.
+- `agenda_lock` — a *setting*: this phone wants Face ID. Set when a passkey is
+  registered here, a year long. This is what makes the lock a property of one
+  device, so the laptop is simply never asked.
+- `agenda_unlocked` — a *fact*: a face was checked recently. Signed, ten
+  minutes, and **not renewed on navigation**.
+- `agenda_webauthn_challenge` — one ceremony's challenge, signed, five minutes,
+  deleted on use whether or not it verified.
+
+**What makes it "every time" is the beacon, not the timer.** `Relock` posts to
+`/api/relock` on `visibilitychange` and `pagehide`, which is what fires on iOS
+when you switch apps or the screen goes off; the cookie is cleared there and
+then. The ten-minute expiry is only the backstop for when that can't run. A
+*short* expiry sounds safer and isn't: it cannot lock the app sooner than
+putting it away already does, and it can interrupt you mid-use — read a page
+for three minutes, tap a chore, get scanned.
+
+**`requireSignedIn` is the enforcement**, on the server, before anything
+renders. There is no screen drawn over a page that was already sent: a locked
+phone gets a 307 and zero bytes of the page, and there's a test asserting
+exactly that.
+
+**The middleware exists for one reason and is not the security check.**
+Measured, not assumed: a server component sees no path — `headers()` carries
+host and the `x-forwarded-*` set and nothing else — so the guard cannot know
+where you were going, and the first version landed everyone on Today after a
+face check no matter what they'd tapped. Middleware is the only place that
+still knows the address, so it redirects to `/unlock?next=…`. It looks only at
+whether two cookies are *present*, never at whether they're valid. Delete the
+file and the lock still holds; you would just always land on Today. It runs
+`runtime = "nodejs"` because the edge build compiles `instrumentation.ts` too,
+and that reaches SQLite and web-push.
+
+**Two ways out, both deliberate.** "Use the dorm passcode instead" on the lock
+screen signs the device out and clears its lock — a way back to the front door,
+not past it, so it is no use to somebody holding your unlocked phone but is the
+only route back for a phone whose camera has died. And deleting the last
+passkey clears the lock, because a lock nothing can open is a brick.
+
+**A loop a browser found and reading the code did not.** Delete the last
+passkey from the other phone and this one still carries `agenda_lock`:
+middleware sent it to the lock screen, the lock screen saw no key to ask with
+and sent it back to the app, forever. A page cannot fix it — server components
+may not set cookies — hence `/api/lock-off`, which clears the stale cookie and
+moves on, and refuses while any passkey exists so it can never be a link that
+turns the lock off.
+
+**Never build a redirect out of `request.url` in a route handler.** It is the
+address the *server* was reached on, not the one the browser used: it sent the
+phone from `localhost` to `0.0.0.0`, a different origin as far as cookies are
+concerned, so the session didn't travel and clearing a stale lock landed on the
+sign-in screen. Behind Fly's proxy it would have done the same. A relative
+`Location` is legal and resolves against the address actually asked for.
+
+**Testing it without a face.** Chrome's WebAuthn debugger, over CDP, provides a
+virtual platform authenticator that holds a real key pair and signs real
+challenges: `WebAuthn.addVirtualAuthenticator`, then `WebAuthn.setUserVerified`
+to make it succeed or refuse. Everything but the camera is exercised for real,
+including that an assertion without user verification is rejected, that a
+forged unlock cookie is rejected, and that an expired one is too (minted in the
+test with the server's own `AGENDA_SECRET`). Served over **http://localhost**:
+that is a secure context for WebAuthn, and "localhost" is a valid relying-party
+id where a bare IP address is not. 23 checks, deterministic across reruns.
+
+**What could not be tested here: the Face ID prompt itself**, on a real iPhone,
+in a home-screen web app. That is the one step the owner has to confirm.
+
 ## Where things stand, as of the last session
 
 Working and deployed: everything above. In rough order of how recently it

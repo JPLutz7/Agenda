@@ -11,6 +11,10 @@ import { getDevices, publicKey } from "@/lib/push";
 import { ICloudSetup } from "@/components/icloud-setup";
 import { PushSetup } from "@/components/push-setup";
 import { ThemePicker } from "@/components/theme-picker";
+import { PasskeySetup } from "@/components/passkey-setup";
+import { listPasskeys } from "@/lib/passkeys";
+import { deviceIsLocked } from "@/lib/auth";
+import { removePasskey, stopLockingThisPhone } from "@/lib/passkey-actions";
 import { getTheme } from "@/lib/prefs";
 import { DORM_COLOR } from "@/lib/colors";
 import {
@@ -62,6 +66,8 @@ export default async function SettingsPage({
   const devices = getDevices();
   const vapidPublicKey = publicKey();
   const theme = await getTheme();
+  const passkeys = listPasskeys();
+  const locked = await deviceIsLocked();
 
   return (
     <>
@@ -317,6 +323,57 @@ export default async function SettingsPage({
           <SubmitButton variant="quiet">Send a test</SubmitButton>
         </ActionForm>
       </div>
+
+      <SectionTitle>Face ID</SectionTitle>
+      <Card className="p-4">
+        <PasskeySetup people={people} alreadyLocked={locked} />
+      </Card>
+
+      {passkeys.length > 0 && (
+        <ul className={`${listClass} mt-3`}>
+          {passkeys.map((key) => (
+            <li
+              key={key.id}
+              className="flex items-center gap-2 px-4 py-3 text-sm"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">
+                  {key.label ?? "A phone"}
+                  {key.person_name ? ` · ${key.person_name}` : ""}
+                </span>
+                <span className="block text-xs text-muted">
+                  {key.last_used_at
+                    ? `Last unlocked ${key.last_used_at.slice(0, 10)}`
+                    : "Not used yet"}
+                </span>
+              </span>
+              <form action={removePasskey.bind(null, key.id)}>
+                <SubmitButton
+                  variant="danger"
+                  size="icon"
+                  title="Forget this phone"
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+                </SubmitButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {locked && (
+        <form action={stopLockingThisPhone} className="mt-3">
+          <SubmitButton variant="quiet">
+            Stop asking on this phone
+          </SubmitButton>
+        </form>
+      )}
+
+      <p className="mt-2 px-1 text-xs text-muted">
+        Set per phone, like the light and dark setting. Your roommate turns it
+        on from their own phone, and a computer you never turn it on for is
+        never asked.
+      </p>
 
       <SectionTitle>Appearance</SectionTitle>
       <ThemePicker current={theme} />

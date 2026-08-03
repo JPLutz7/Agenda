@@ -302,6 +302,27 @@ function migrate(db: Database.Database) {
       failures    INTEGER NOT NULL DEFAULT 0
     );
 
+    -- One row per phone that has been told to ask for Face ID.
+    --
+    -- The public key only. A passkey's private half never leaves the phone's
+    -- secure enclave — there is nothing here worth stealing, which is the
+    -- whole point of the scheme: losing this table costs a re-registration
+    -- per phone and gives an attacker nothing.
+    --
+    -- 'counter' is the authenticator's own signature count, kept so a cloned
+    -- credential replaying an old assertion can be spotted.
+    CREATE TABLE IF NOT EXISTS passkeys (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      credential_id  TEXT NOT NULL UNIQUE,   -- base64url, as the browser sends it
+      public_key     TEXT NOT NULL,          -- base64url COSE key
+      counter        INTEGER NOT NULL DEFAULT 0,
+      transports     TEXT,                   -- JSON array, for a better prompt
+      label          TEXT,                   -- "Joao's iPhone"
+      person_id      INTEGER REFERENCES people(id) ON DELETE SET NULL,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at   TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL

@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { LiveRefresh } from "@/components/live-refresh";
+import { Relock } from "@/components/relock";
 import { getTheme } from "@/lib/prefs";
+import { deviceIsLocked, isUnlocked } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Agenda",
@@ -49,13 +51,20 @@ export default async function RootLayout({
   // in the first paint. Doing it in a script on the client is the usual way and
   // it flashes the wrong colours for a frame on every single page load.
   const theme = await getTheme();
+  const locked = await deviceIsLocked();
+  // A locked phone that hasn't been unlocked can only be looking at the lock
+  // screen — everything else was refused before it rendered. So the tab bar
+  // would be five taps that all bounce straight back here, on a screen whose
+  // whole job is to have one thing on it.
+  const showNav = !locked || (await isUnlocked());
 
   return (
     <html lang="en" data-theme={theme === "system" ? undefined : theme}>
       <body className="antialiased">
         <LiveRefresh />
+        {locked && <Relock />}
         <main className="mx-auto w-full max-w-2xl px-4 pt-6">{children}</main>
-        <Nav />
+        {showNav && <Nav />}
       </body>
     </html>
   );
